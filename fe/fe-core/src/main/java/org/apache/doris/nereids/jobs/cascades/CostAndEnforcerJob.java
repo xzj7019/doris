@@ -39,6 +39,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -244,13 +245,15 @@ public class CostAndEnforcerJob extends Job implements Cloneable {
 
         // update current group statistics and re-compute costs.
         if (groupExpression.children().stream().anyMatch(group -> group.getStatistics() == null)) {
+            // TODO: If it's error, add some warning log at least.
             // if we come here, mean that we have some error in stats calculator and should fix it.
             return false;
         }
         StatsCalculator statsCalculator = StatsCalculator.estimate(groupExpression,
                 context.getCascadesContext().getConnectContext().getSessionVariable().getForbidUnknownColStats(),
                 context.getCascadesContext().getConnectContext().getTotalColumnStatisticMap(),
-                context.getCascadesContext().getConnectContext().getSessionVariable().isPlayNereidsDump());
+                context.getCascadesContext().getConnectContext().getSessionVariable().isPlayNereidsDump(),
+                new HashMap<>());
         context.getCascadesContext().getConnectContext().getTotalColumnStatisticMap()
                 .putAll(statsCalculator.getTotalColumnStatisticMap());
         context.getCascadesContext().getConnectContext().getTotalHistogramMap()

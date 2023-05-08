@@ -19,7 +19,7 @@ package org.apache.doris.nereids.rules.implementation;
 
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchorOperator;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchor;
 
 /**
  * Implementation rule that convert logical CTE anchor to physical CTE anchor.
@@ -27,7 +27,7 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchorOperator;
 public class LogicalCTEAnchorToPhysicalCTEAnchor extends OneImplementationRuleFactory {
     @Override
     public Rule build() {
-        return logicalCTEAnchor().then(cte -> new PhysicalCTEAnchorOperator(
+        return logicalCTEAnchor().then(cte -> new PhysicalCTEAnchor(
             cte.getCteId(),
             cte.getConsumeNum(),
             cte.getProjection(),

@@ -69,6 +69,9 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalTopN;
 import org.apache.doris.nereids.trees.plans.logical.LogicalUnion;
 import org.apache.doris.nereids.trees.plans.logical.LogicalWindow;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalAssertNumRows;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchor;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumer;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProducer;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalDistribute;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEmptyRelation;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEsScan;
@@ -102,6 +105,7 @@ import org.apache.doris.statistics.StatisticRange;
 import org.apache.doris.statistics.Statistics;
 import org.apache.doris.statistics.StatisticsBuilder;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import org.apache.commons.collections.CollectionUtils;
 
@@ -127,12 +131,16 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
 
     private Map<String, Histogram> totalHistogramMap = new HashMap<>();
 
+    private Map<Integer, Statistics> cteIdToStats;
+
     private StatsCalculator(GroupExpression groupExpression, boolean forbidUnknownColStats,
-                                Map<String, ColumnStatistic> columnStatisticMap, boolean isPlayNereidsDump) {
+                                Map<String, ColumnStatistic> columnStatisticMap, boolean isPlayNereidsDump,
+            Map<Integer, Statistics> cteIdToStats) {
         this.groupExpression = groupExpression;
         this.forbidUnknownColStats = forbidUnknownColStats;
         this.totalColumnStatisticMap = columnStatisticMap;
         this.isPlayNereidsDump = isPlayNereidsDump;
+        this.cteIdToStats = cteIdToStats;
     }
 
     public Map<String, Histogram> getTotalHistogramMap() {
@@ -155,31 +163,23 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
      * estimate stats
      */
     public static StatsCalculator estimate(GroupExpression groupExpression, boolean forbidUnknownColStats,
-                                           Map<String, ColumnStatistic> columnStatisticMap, boolean isPlayNereidsDump) {
+                                           Map<String, ColumnStatistic> columnStatisticMap, boolean isPlayNereidsDump,
+            Map<Integer, Statistics> cteIdToStats) {
         StatsCalculator statsCalculator = new StatsCalculator(
-                groupExpression, forbidUnknownColStats, columnStatisticMap, isPlayNereidsDump);
+                groupExpression, forbidUnknownColStats, columnStatisticMap, isPlayNereidsDump, cteIdToStats);
         statsCalculator.estimate();
         return statsCalculator;
     }
 
     public static void estimate(GroupExpression groupExpression) {
-        StatsCalculator statsCalculator = new StatsCalculator(groupExpression, false, new HashMap<>(), false);
+        StatsCalculator statsCalculator = new StatsCalculator(groupExpression, false,
+                new HashMap<>(), false, null);
         statsCalculator.estimate();
     }
 
     private void estimate() {
-        // TODO: jichang to fix it
-        //Statistics stats = plan.accept(this, null);
         Plan plan = groupExpression.getPlan();
-        Set<SlotReference> slotSet = plan.getOutput().stream().filter(SlotReference.class::isInstance)
-                .map(s -> (SlotReference) s).collect(Collectors.toSet());
-        double rowCount = 100000.0;
-        Map<Expression, ColumnStatistic> columnStatisticMap = new HashMap<>();
-        for (SlotReference slotReference : slotSet) {
-            columnStatisticMap.put(slotReference, ColumnStatistic.UNKNOWN);
-        }
-        Statistics stats = new Statistics(rowCount, columnStatisticMap);
-
+        Statistics stats = plan.accept(this, null);
         Statistics originStats = groupExpression.getOwnerGroup().getStatistics();
         /*
         in an ideal cost model, every group expression in a group are equivalent, but in fact the cost are different.
@@ -808,39 +808,46 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
 
     @Override
     public Statistics visitLogicalCTEProducer(LogicalCTEProducer<? extends Plan> cteProducer, Void context) {
-        // TODO: jichang to fix it
-        Set<SlotReference> slotSet = cteProducer.getOutput().stream().filter(SlotReference.class::isInstance)
-                .map(s -> (SlotReference) s).collect(Collectors.toSet());
-        double rowCount = 100000.0;
-        Map<Expression, ColumnStatistic> columnStatisticMap = new HashMap<>();
-        for (SlotReference slotReference : slotSet) {
-            columnStatisticMap.put(slotReference, ColumnStatistic.UNKNOWN);
-        }
-        return new Statistics(rowCount, columnStatisticMap);
+        Statistics statistics = groupExpression.childStatistics(0);
+        cteIdToStats.put(cteProducer.getCteId(), statistics);
+        return statistics;
     }
 
     @Override
     public Statistics visitLogicalCTEConsumer(LogicalCTEConsumer cteConsumer, Void context) {
-        Set<SlotReference> slotSet = cteConsumer.getOutput().stream().filter(SlotReference.class::isInstance)
-                .map(s -> (SlotReference) s).collect(Collectors.toSet());
-        double rowCount = 100000.0;
-        Map<Expression, ColumnStatistic> columnStatisticMap = new HashMap<>();
-        for (SlotReference slotReference : slotSet) {
-            columnStatisticMap.put(slotReference, ColumnStatistic.UNKNOWN);
-        }
-        return new Statistics(rowCount, columnStatisticMap);
+        int cteId = cteConsumer.getCteId();
+        Statistics statistics = cteIdToStats.get(cteId);
+        Preconditions.checkArgument(statistics != null, String.format("Stats for CTE: %d not found", cteId));
+        return statistics;
     }
 
     @Override
     public Statistics visitLogicalCTEAnchor(LogicalCTEAnchor<? extends Plan, ? extends Plan> cteAnchor, Void context) {
-        // TODO: jichang to fix it
-        Set<SlotReference> slotSet = cteAnchor.getOutput().stream().filter(SlotReference.class::isInstance)
-                .map(s -> (SlotReference) s).collect(Collectors.toSet());
-        double rowCount = 100000.0;
-        Map<Expression, ColumnStatistic> columnStatisticMap = new HashMap<>();
-        for (SlotReference slotReference : slotSet) {
-            columnStatisticMap.put(slotReference, ColumnStatistic.UNKNOWN);
+        return groupExpression.childStatistics(1);
+    }
+
+    @Override
+    public Statistics visitPhysicalCTEProduce(PhysicalCTEProducer<? extends Plan> cteProduceOperator,
+            Void context) {
+        Statistics statistics = groupExpression.childStatistics(0);
+        cteIdToStats.put(cteProduceOperator.getCteId(), statistics);
+        return statistics;
+    }
+
+    @Override
+    public Statistics visitPhysicalCTEConsume(PhysicalCTEConsumer cteConsumeOperator, Void context) {
+        int cteId = cteConsumeOperator.getCteId();
+        Statistics statistics = cteIdToStats.get(cteId);
+        if (statistics == null) {
+            statistics = groupExpression.getOwnerGroup().getStatistics();
         }
-        return new Statistics(rowCount, columnStatisticMap);
+        Preconditions.checkArgument(statistics != null, String.format("Stats for CTE: %d not found", cteId));
+        return statistics;
+    }
+
+    @Override
+    public Statistics visitPhysicalCTEAnchor(
+            PhysicalCTEAnchor<? extends Plan, ? extends Plan> cteAnchorOperator, Void context) {
+        return groupExpression.childStatistics(1);
     }
 }

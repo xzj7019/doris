@@ -83,9 +83,9 @@ import org.apache.doris.nereids.trees.plans.PreAggStatus;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalJoin;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalSort;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalAssertNumRows;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchorOperator;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumeOperator;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProduceOperator;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchor;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumer;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProducer;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalDistribute;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEmptyRelation;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEsScan;
@@ -1797,7 +1797,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
     }
 
     @Override
-    public PlanFragment visitPhysicalCTEConsume(PhysicalCTEConsumeOperator consume,
+    public PlanFragment visitPhysicalCTEConsume(PhysicalCTEConsumer consume,
                                                 PlanTranslatorContext context) {
         int cteId = consume.getCteId();
         MultiCastPlanFragment multCastFragment = (MultiCastPlanFragment) context.getCteProduceFragments().get(cteId);
@@ -1816,6 +1816,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
         DataStreamSink streamSink = new DataStreamSink(exchangeNode.getId());
         streamSink.setPartition(DataPartition.RANDOM);
         streamSink.setFragment(multCastFragment);
+
         multiCastDataSink.getDataStreamSinks().add(streamSink);
         multiCastDataSink.getDestinations().add(Lists.newArrayList());
 
@@ -1890,7 +1891,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
     }
 
     @Override
-    public PlanFragment visitPhysicalCTEProduce(PhysicalCTEProduceOperator<? extends Plan> produceOperator,
+    public PlanFragment visitPhysicalCTEProduce(PhysicalCTEProducer<? extends Plan> produceOperator,
                                                 PlanTranslatorContext context) {
         PlanFragment child = visit(produceOperator, context);
         int cteId = produceOperator.getCteId();
@@ -1911,7 +1912,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
     }
 
     @Override
-    public PlanFragment visitPhysicalCTEAnchor(PhysicalCTEAnchorOperator<? extends Plan, ? extends Plan> anchorOperator,
+    public PlanFragment visitPhysicalCTEAnchor(PhysicalCTEAnchor<? extends Plan, ? extends Plan> anchorOperator,
                                                PlanTranslatorContext context) {
         return visit(anchorOperator, context);
     }

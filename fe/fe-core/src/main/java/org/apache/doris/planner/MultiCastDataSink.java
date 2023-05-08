@@ -55,7 +55,6 @@ public class MultiCastDataSink extends DataSink {
         TMultiCastDataStreamSink sink = new TMultiCastDataStreamSink();
         sink.setSinks(streamSinkList);
         sink.setDestinations(destinations);
-
         TDataSink result = new TDataSink(TDataSinkType.MULTI_CAST_DATA_STREAM_SINK);
         result.setMultiCastStreamSink(sink);
         return result;

@@ -19,7 +19,7 @@ package org.apache.doris.nereids.rules.implementation;
 
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumeOperator;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumer;
 
 /**
  * Implementation rule that convert logical CTE consumer to physical CTE consumer.
@@ -27,7 +27,7 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumeOperator;
 public class LogicalCTEConsumeToPhysicalCTEConsume extends OneImplementationRuleFactory {
     @Override
     public Rule build() {
-        return logicalCTEConsumer().then(cte -> new PhysicalCTEConsumeOperator(
+        return logicalCTEConsumer().then(cte -> new PhysicalCTEConsumer(
             cte.getCteId(),
             cte.getProducerToConsumerOutputMap(),
             cte.getPredicates(),

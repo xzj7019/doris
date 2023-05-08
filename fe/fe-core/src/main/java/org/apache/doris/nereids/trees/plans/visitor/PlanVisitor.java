@@ -61,9 +61,9 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalWindow;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalJoin;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalSort;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalAssertNumRows;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchorOperator;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumeOperator;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProduceOperator;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchor;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumer;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProducer;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalDistribute;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEmptyRelation;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEsScan;
@@ -330,16 +330,16 @@ public abstract class PlanVisitor<R, C> {
         return visit(limit, context);
     }
 
-    public R visitPhysicalCTEProduce(PhysicalCTEProduceOperator<? extends Plan> cteProduceOperator, C context) {
+    public R visitPhysicalCTEProduce(PhysicalCTEProducer<? extends Plan> cteProduceOperator, C context) {
         return visit(cteProduceOperator, context);
     }
 
-    public R visitPhysicalCTEConsume(PhysicalCTEConsumeOperator cteConsumeOperator, C context) {
+    public R visitPhysicalCTEConsume(PhysicalCTEConsumer cteConsumeOperator, C context) {
         return visit(cteConsumeOperator, context);
     }
 
     public R visitPhysicalCTEAnchor(
-            PhysicalCTEAnchorOperator<? extends Plan, ? extends Plan> cteAnchorOperator, C context) {
+            PhysicalCTEAnchor<? extends Plan, ? extends Plan> cteAnchorOperator, C context) {
         return visit(cteAnchorOperator, context);
     }
 

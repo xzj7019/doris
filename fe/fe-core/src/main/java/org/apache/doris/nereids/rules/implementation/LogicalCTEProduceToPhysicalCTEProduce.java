@@ -19,7 +19,7 @@ package org.apache.doris.nereids.rules.implementation;
 
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProduceOperator;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProducer;
 
 /**
  * Implementation rule that convert logical CTE producer to physical CTE producer.
@@ -27,7 +27,7 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProduceOperator;
 public class LogicalCTEProduceToPhysicalCTEProduce extends OneImplementationRuleFactory {
     @Override
     public Rule build() {
-        return logicalCTEProducer().then(cte -> new PhysicalCTEProduceOperator(
+        return logicalCTEProducer().then(cte -> new PhysicalCTEProducer(
             cte.getCteId(),
             //cte.getGroupExpression(),
             cte.getLogicalProperties(),

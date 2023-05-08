@@ -31,9 +31,9 @@ import org.apache.doris.nereids.trees.expressions.functions.table.TableValuedFun
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalSort;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalAssertNumRows;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchorOperator;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumeOperator;
-import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProduceOperator;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEAnchor;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEConsumer;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalCTEProducer;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalDistribute;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalEsScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalFileScan;
@@ -90,13 +90,13 @@ public class ChildOutputPropertyDeriver extends PlanVisitor<PhysicalProperties, 
 
     @Override
     public PhysicalProperties visitPhysicalCTEProduce(
-            PhysicalCTEProduceOperator<? extends Plan> cteProducer, PlanContext context) {
+            PhysicalCTEProducer<? extends Plan> cteProducer, PlanContext context) {
         return childrenOutputProperties.get(0);
     }
 
     @Override
     public PhysicalProperties visitPhysicalCTEConsume(
-            PhysicalCTEConsumeOperator cteConsumeOperator, PlanContext context) {
+            PhysicalCTEConsumer cteConsumeOperator, PlanContext context) {
         // TODO: can't pass from producer to consumer
         // use ANY here currently
         return PhysicalProperties.ANY;
@@ -104,7 +104,7 @@ public class ChildOutputPropertyDeriver extends PlanVisitor<PhysicalProperties, 
 
     @Override
     public PhysicalProperties visitPhysicalCTEAnchor(
-            PhysicalCTEAnchorOperator<? extends Plan, ? extends Plan> cteAnchorOperator, PlanContext context) {
+            PhysicalCTEAnchor<? extends Plan, ? extends Plan> cteAnchorOperator, PlanContext context) {
         return childrenOutputProperties.get(1);
     }
 

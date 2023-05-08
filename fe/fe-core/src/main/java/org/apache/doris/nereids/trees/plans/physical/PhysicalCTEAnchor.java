@@ -36,7 +36,7 @@ import java.util.Optional;
 /**
  * Physical CTE anchor operator.
  */
-public class PhysicalCTEAnchorOperator<
+public class PhysicalCTEAnchor<
         LEFT_CHILD_TYPE extends Plan,
         RIGHT_CHILD_TYPE extends Plan>
         extends PhysicalBinary<LEFT_CHILD_TYPE, RIGHT_CHILD_TYPE> {
@@ -44,7 +44,7 @@ public class PhysicalCTEAnchorOperator<
     private final int consumeNum;
     private final List<Expression> projection;
 
-    public PhysicalCTEAnchorOperator(int cteId, int consumeNum, List<Expression> projection,
+    public PhysicalCTEAnchor(int cteId, int consumeNum, List<Expression> projection,
                                      LogicalProperties logicalProperties,
                                      LEFT_CHILD_TYPE leftChild,
                                      RIGHT_CHILD_TYPE rightChild) {
@@ -55,7 +55,7 @@ public class PhysicalCTEAnchorOperator<
         this.projection = projection;
     }
 
-    public PhysicalCTEAnchorOperator(int cteId, int consumeNum, List<Expression> projection,
+    public PhysicalCTEAnchor(int cteId, int consumeNum, List<Expression> projection,
                                      Optional<GroupExpression> groupExpression,
                                       LogicalProperties logicalProperties,
                                      LEFT_CHILD_TYPE leftChild,
@@ -66,7 +66,7 @@ public class PhysicalCTEAnchorOperator<
         this.projection = projection;
     }
 
-    public PhysicalCTEAnchorOperator(int cteId, int consumeNum, List<Expression> projection,
+    public PhysicalCTEAnchor(int cteId, int consumeNum, List<Expression> projection,
                                      Optional<GroupExpression> groupExpression,
                                       LogicalProperties logicalProperties, PhysicalProperties physicalProperties,
                                       Statistics statistics, LEFT_CHILD_TYPE leftChild,
@@ -101,7 +101,7 @@ public class PhysicalCTEAnchorOperator<
             return false;
         }
 
-        PhysicalCTEAnchorOperator that = (PhysicalCTEAnchorOperator) o;
+        PhysicalCTEAnchor that = (PhysicalCTEAnchor) o;
         return Objects.equals(cteId, that.cteId);
     }
 
@@ -125,28 +125,28 @@ public class PhysicalCTEAnchorOperator<
     }
 
     @Override
-    public PhysicalCTEAnchorOperator<Plan, Plan> withChildren(List<Plan> children) {
+    public PhysicalCTEAnchor<Plan, Plan> withChildren(List<Plan> children) {
         Preconditions.checkArgument(children.size() == 2);
-        return new PhysicalCTEAnchorOperator<>(cteId, consumeNum, projection,
+        return new PhysicalCTEAnchor<>(cteId, consumeNum, projection,
             getLogicalProperties(), children.get(0), children.get(1));
     }
 
     @Override
-    public PhysicalCTEAnchorOperator<Plan, Plan> withGroupExpression(Optional<GroupExpression> groupExpression) {
-        return new PhysicalCTEAnchorOperator<>(cteId, consumeNum, projection, groupExpression, getLogicalProperties(),
+    public PhysicalCTEAnchor<Plan, Plan> withGroupExpression(Optional<GroupExpression> groupExpression) {
+        return new PhysicalCTEAnchor<>(cteId, consumeNum, projection, groupExpression, getLogicalProperties(),
             child(0), child(1));
     }
 
     @Override
-    public PhysicalCTEAnchorOperator<Plan, Plan> withLogicalProperties(Optional<LogicalProperties> logicalProperties) {
-        return new PhysicalCTEAnchorOperator<>(cteId, consumeNum, projection,
+    public PhysicalCTEAnchor<Plan, Plan> withLogicalProperties(Optional<LogicalProperties> logicalProperties) {
+        return new PhysicalCTEAnchor<>(cteId, consumeNum, projection,
             Optional.empty(), logicalProperties.get(), child(0), child(1));
     }
 
     @Override
-    public PhysicalCTEAnchorOperator<Plan, Plan> withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
+    public PhysicalCTEAnchor<Plan, Plan> withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
                                                                                  Statistics statistics) {
-        return new PhysicalCTEAnchorOperator<>(cteId, consumeNum, projection, groupExpression,
+        return new PhysicalCTEAnchor<>(cteId, consumeNum, projection, groupExpression,
             getLogicalProperties(), physicalProperties,
             statistics, child(0), child(1));
     }

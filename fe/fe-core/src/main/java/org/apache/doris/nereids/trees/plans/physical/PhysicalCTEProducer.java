@@ -36,21 +36,21 @@ import java.util.Optional;
 /**
  * Physical CTE producer operator.
  */
-public class PhysicalCTEProduceOperator<CHILD_TYPE extends Plan> extends PhysicalUnary<CHILD_TYPE> {
+public class PhysicalCTEProducer<CHILD_TYPE extends Plan> extends PhysicalUnary<CHILD_TYPE> {
     private final int cteId;
 
-    public PhysicalCTEProduceOperator(int cteId, LogicalProperties logicalProperties, CHILD_TYPE child) {
+    public PhysicalCTEProducer(int cteId, LogicalProperties logicalProperties, CHILD_TYPE child) {
         super(PlanType.PHYSICAL_CTE_PRODUCE, Optional.empty(), logicalProperties, child);
         this.cteId = cteId;
     }
 
-    public PhysicalCTEProduceOperator(int cteId, Optional<GroupExpression> groupExpression,
+    public PhysicalCTEProducer(int cteId, Optional<GroupExpression> groupExpression,
                           LogicalProperties logicalProperties, CHILD_TYPE child) {
         super(PlanType.PHYSICAL_CTE_PRODUCE, groupExpression, logicalProperties, child);
         this.cteId = cteId;
     }
 
-    public PhysicalCTEProduceOperator(int cteId, Optional<GroupExpression> groupExpression,
+    public PhysicalCTEProducer(int cteId, Optional<GroupExpression> groupExpression,
                           LogicalProperties logicalProperties, PhysicalProperties physicalProperties,
                           Statistics statistics, CHILD_TYPE child) {
         super(PlanType.PHYSICAL_CTE_PRODUCE, groupExpression, logicalProperties, physicalProperties, statistics, child);
@@ -79,7 +79,7 @@ public class PhysicalCTEProduceOperator<CHILD_TYPE extends Plan> extends Physica
             return false;
         }
 
-        PhysicalCTEProduceOperator that = (PhysicalCTEProduceOperator) o;
+        PhysicalCTEProducer that = (PhysicalCTEProducer) o;
         return Objects.equals(cteId, that.cteId);
     }
 
@@ -103,25 +103,25 @@ public class PhysicalCTEProduceOperator<CHILD_TYPE extends Plan> extends Physica
     }
 
     @Override
-    public PhysicalCTEProduceOperator<Plan> withChildren(List<Plan> children) {
+    public PhysicalCTEProducer<Plan> withChildren(List<Plan> children) {
         Preconditions.checkArgument(children.size() == 1);
-        return new PhysicalCTEProduceOperator<>(cteId, getLogicalProperties(), children.get(0));
+        return new PhysicalCTEProducer<>(cteId, getLogicalProperties(), children.get(0));
     }
 
     @Override
-    public PhysicalCTEProduceOperator<CHILD_TYPE> withGroupExpression(Optional<GroupExpression> groupExpression) {
-        return new PhysicalCTEProduceOperator<>(cteId, groupExpression, getLogicalProperties(), child());
+    public PhysicalCTEProducer<CHILD_TYPE> withGroupExpression(Optional<GroupExpression> groupExpression) {
+        return new PhysicalCTEProducer<>(cteId, groupExpression, getLogicalProperties(), child());
     }
 
     @Override
-    public PhysicalCTEProduceOperator<CHILD_TYPE> withLogicalProperties(Optional<LogicalProperties> logicalProperties) {
-        return new PhysicalCTEProduceOperator<>(cteId, Optional.empty(), logicalProperties.get(), child());
+    public PhysicalCTEProducer<CHILD_TYPE> withLogicalProperties(Optional<LogicalProperties> logicalProperties) {
+        return new PhysicalCTEProducer<>(cteId, Optional.empty(), logicalProperties.get(), child());
     }
 
     @Override
-    public PhysicalCTEProduceOperator<CHILD_TYPE> withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
+    public PhysicalCTEProducer<CHILD_TYPE> withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
                                                                      Statistics statistics) {
-        return new PhysicalCTEProduceOperator<>(cteId, groupExpression, getLogicalProperties(), physicalProperties,
+        return new PhysicalCTEProducer<>(cteId, groupExpression, getLogicalProperties(), physicalProperties,
             statistics, child());
     }
 

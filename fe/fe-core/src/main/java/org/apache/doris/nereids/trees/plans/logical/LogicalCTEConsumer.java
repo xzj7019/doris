@@ -109,7 +109,7 @@ public class LogicalCTEConsumer extends LogicalLeaf {
 
     @Override
     public <R, C> R accept(PlanVisitor<R, C> visitor, C context) {
-        return visitor.visit(this, context);
+        return visitor.visitLogicalCTEConsumer(this, context);
     }
 
     @Override

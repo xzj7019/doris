@@ -38,7 +38,7 @@ import java.util.Optional;
 /**
  * Physical CTE consumer operator.
  */
-public class PhysicalCTEConsumeOperator extends PhysicalLeaf {
+public class PhysicalCTEConsumer extends PhysicalLeaf {
     private final int cteId;
 
     private List<Expression> predicates;
@@ -47,7 +47,7 @@ public class PhysicalCTEConsumeOperator extends PhysicalLeaf {
 
     private final Map<Slot, Slot> cteOutputColumnRefMap;
 
-    public PhysicalCTEConsumeOperator(int cteId, Map<Slot, Slot> cteOutputColumnRefMap,
+    public PhysicalCTEConsumer(int cteId, Map<Slot, Slot> cteOutputColumnRefMap,
                                       List<Expression> predicates, List<Expression> projections,
                                       LogicalProperties logicalProperties) {
         super(PlanType.PHYSICAL_CTE_CONSUME, Optional.empty(), logicalProperties);
@@ -57,7 +57,7 @@ public class PhysicalCTEConsumeOperator extends PhysicalLeaf {
         this.projections = projections;
     }
 
-    public PhysicalCTEConsumeOperator(int cteId, Map<Slot, Slot> cteOutputColumnRefMap,
+    public PhysicalCTEConsumer(int cteId, Map<Slot, Slot> cteOutputColumnRefMap,
                                       List<Expression> predicates, List<Expression> projections,
                                       Optional<GroupExpression> groupExpression,
                                       LogicalProperties logicalProperties) {
@@ -68,7 +68,7 @@ public class PhysicalCTEConsumeOperator extends PhysicalLeaf {
         this.projections = projections;
     }
 
-    public PhysicalCTEConsumeOperator(int cteId, Map<Slot, Slot> cteOutputColumnRefMap,
+    public PhysicalCTEConsumer(int cteId, Map<Slot, Slot> cteOutputColumnRefMap,
                                       List<Expression> predicates, List<Expression> projections,
                                       Optional<GroupExpression> groupExpression,
                                       LogicalProperties logicalProperties, PhysicalProperties physicalProperties,
@@ -111,7 +111,7 @@ public class PhysicalCTEConsumeOperator extends PhysicalLeaf {
             return false;
         }
 
-        PhysicalCTEConsumeOperator that = (PhysicalCTEConsumeOperator) o;
+        PhysicalCTEConsumer that = (PhysicalCTEConsumer) o;
         return Objects.equals(cteId, that.cteId)
                 && Objects.equals(cteOutputColumnRefMap, that.cteOutputColumnRefMap);
     }
@@ -136,28 +136,28 @@ public class PhysicalCTEConsumeOperator extends PhysicalLeaf {
     }
 
     @Override
-    public PhysicalCTEConsumeOperator withChildren(List<Plan> children) {
+    public PhysicalCTEConsumer withChildren(List<Plan> children) {
         Preconditions.checkArgument(children.size() == 0);
-        return new PhysicalCTEConsumeOperator(cteId, cteOutputColumnRefMap, predicates, projections,
+        return new PhysicalCTEConsumer(cteId, cteOutputColumnRefMap, predicates, projections,
                                                 getLogicalProperties());
     }
 
     @Override
-    public PhysicalCTEConsumeOperator withGroupExpression(Optional<GroupExpression> groupExpression) {
-        return new PhysicalCTEConsumeOperator(cteId, cteOutputColumnRefMap, predicates, projections,
+    public PhysicalCTEConsumer withGroupExpression(Optional<GroupExpression> groupExpression) {
+        return new PhysicalCTEConsumer(cteId, cteOutputColumnRefMap, predicates, projections,
                                                 groupExpression, getLogicalProperties());
     }
 
     @Override
-    public PhysicalCTEConsumeOperator withLogicalProperties(Optional<LogicalProperties> logicalProperties) {
-        return new PhysicalCTEConsumeOperator(cteId, cteOutputColumnRefMap, predicates, projections,
+    public PhysicalCTEConsumer withLogicalProperties(Optional<LogicalProperties> logicalProperties) {
+        return new PhysicalCTEConsumer(cteId, cteOutputColumnRefMap, predicates, projections,
             Optional.empty(), logicalProperties.get());
     }
 
     @Override
-    public PhysicalCTEConsumeOperator withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
+    public PhysicalCTEConsumer withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
                                                                                  Statistics statistics) {
-        return new PhysicalCTEConsumeOperator(cteId, cteOutputColumnRefMap, predicates, projections, groupExpression,
+        return new PhysicalCTEConsumer(cteId, cteOutputColumnRefMap, predicates, projections, groupExpression,
             getLogicalProperties(), physicalProperties,
             statistics);
     }

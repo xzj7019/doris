@@ -79,7 +79,7 @@ public class LogicalCTEAnchor<
 
     @Override
     public <R, C> R accept(PlanVisitor<R, C> visitor, C context) {
-        return visitor.visit(this, context);
+        return visitor.visitLogicalCTEAnchor(this, context);
     }
 
     @Override

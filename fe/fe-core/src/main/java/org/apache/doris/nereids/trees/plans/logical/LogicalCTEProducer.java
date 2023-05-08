@@ -77,7 +77,7 @@ public class LogicalCTEProducer<CHILD_TYPE extends Plan>
 
     @Override
     public <R, C> R accept(PlanVisitor<R, C> visitor, C context) {
-        return visitor.visit(this, context);
+        return visitor.visitLogicalCTEProducer(this, context);
     }
 
     @Override
