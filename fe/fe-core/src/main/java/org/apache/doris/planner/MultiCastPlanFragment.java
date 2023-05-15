@@ -69,37 +69,4 @@ public class MultiCastPlanFragment extends PlanFragment {
             multiCastDataSink.getDestinations().add(Lists.newArrayList());
         }
     }
-
-    @Override
-    public PlanFragment getDestFragment() {
-        Preconditions.checkState(false);
-        return null;
-    }
-
-    @Override
-    public void setDestination(ExchangeNode destNode) {
-        Preconditions.checkState(false);
-    }
-
-    @Override
-    public void setParallelExecNum(int parallelExecNum) {
-        Preconditions.checkState(false);
-    }
-
-    @Override
-    public int getNumNodes() {
-        Preconditions.checkState(false);
-        return 0;
-    }
-
-    @Override
-    public void setOutputPartition(DataPartition outputPartition) {
-        Preconditions.checkState(false);
-    }
-
-    //@Override
-    //public void setSink(DataSink sink) {
-    //    Preconditions.checkState(false);
-    //}
-
 }
