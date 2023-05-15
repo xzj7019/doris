@@ -1427,9 +1427,7 @@ public class Coordinator {
                     TPlanFragmentDestination dest = new TPlanFragmentDestination();
                     dest.fragment_instance_id = destParams.instanceExecParams.get(j).instanceId;
                     dest.server = toRpcHost(destParams.instanceExecParams.get(j).host);
-                    // TODO:
-                    //dest.brpc_server = SystemInfoService.toBrpcHost(destParams.instanceExecParams.get(j).host);
-                    dest.brpc_server = toRpcHost(destParams.instanceExecParams.get(j).host);
+                    dest.brpc_server = toBrpcHost(destParams.instanceExecParams.get(j).host);
                     multiSink.getDestinations().get(i).add(dest);
                 }
             }
