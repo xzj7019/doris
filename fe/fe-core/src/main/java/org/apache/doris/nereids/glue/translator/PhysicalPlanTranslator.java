@@ -1800,7 +1800,6 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
     public PlanFragment visitPhysicalCTEConsume(PhysicalCTEConsumeOperator consume,
                                                 PlanTranslatorContext context) {
         int cteId = consume.getCteId();
-        // producer plan fragment
         MultiCastPlanFragment multCastFragment = (MultiCastPlanFragment) context.getCteProduceFragments().get(cteId);
 
         Preconditions.checkState(multCastFragment.getSink() instanceof MultiCastDataSink,
@@ -1817,9 +1816,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
         DataStreamSink streamSink = new DataStreamSink(exchangeNode.getId());
         streamSink.setPartition(DataPartition.RANDOM);
         streamSink.setFragment(multCastFragment);
-        //streamSink.setOutputColumnIds(f.getProjectList());
         multiCastDataSink.getDataStreamSinks().add(streamSink);
-        // multiCastDataSink.getDestinations() returns a List<List<TPlanFragmentDestination>>
         multiCastDataSink.getDestinations().add(Lists.newArrayList());
 
         exchangeNode.setReceiveColumns(consume.getCteOutputColumnRefMap().values().stream()
@@ -1837,6 +1834,7 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
         consumeFragment = buildProjectNode(projectMap, consumeFragment, context);
 
         // add filter node
+        // TODO: enable the filter
         if (consume.getPredicates() != null && false) {
             List<Expr> predicates = consume.getPredicates().stream()
                     .map(e -> ExpressionTranslator.translate(e, context))
@@ -1877,8 +1875,6 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
         inputPlanNode.getTblRefIds().add(tupleDescriptor.getId());
         inputPlanNode.getNullableTupleIds().clear();
         inputPlanNode.getNullableTupleIds().add(tupleDescriptor.getId());
-        //tblRefIds.addAll(getChild(0).getTblRefIds());
-        //nullableTupleIds.addAll(getChild(0).getNullableTupleIds());
 
         List<Expr> execExprList = execList
                 .stream()

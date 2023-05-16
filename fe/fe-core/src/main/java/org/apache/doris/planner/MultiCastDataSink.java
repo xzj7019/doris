@@ -24,7 +24,6 @@ import org.apache.doris.thrift.TExplainLevel;
 import org.apache.doris.thrift.TMultiCastDataStreamSink;
 import org.apache.doris.thrift.TPlanFragmentDestination;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.util.List;
@@ -64,14 +63,12 @@ public class MultiCastDataSink extends DataSink {
 
     @Override
     public PlanNodeId getExchNodeId() {
-        Preconditions.checkState(false);
-        return null;
+        return fragment.getPlanRoot().getId();
     }
 
     @Override
     public DataPartition getOutputPartition() {
-        Preconditions.checkState(false);
-        return null;
+        return fragment.outputPartition;
     }
 
     public List<DataStreamSink> getDataStreamSinks() {

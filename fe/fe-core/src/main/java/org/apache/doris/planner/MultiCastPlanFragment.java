@@ -17,9 +17,6 @@
 
 package org.apache.doris.planner;
 
-import org.apache.doris.thrift.TResultSinkType;
-
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.util.List;
@@ -31,42 +28,17 @@ import java.util.stream.Collectors;
 public class MultiCastPlanFragment extends PlanFragment {
     private final List<ExchangeNode> destNodeList = Lists.newArrayList();
 
+    public MultiCastPlanFragment(PlanFragment planFragment) {
+        super(planFragment.getFragmentId(), planFragment.getPlanRoot(), planFragment.getDataPartition());
+        this.outputPartition = DataPartition.RANDOM;
+        this.children.addAll(planFragment.getChildren());
+    }
+
     public List<ExchangeNode> getDestNodeList() {
         return destNodeList;
     }
 
-    public MultiCastPlanFragment(PlanFragment planFragment) {
-        super(planFragment.getFragmentId(), planFragment.getPlanRoot(), planFragment.getDataPartition());
-        // Use random, only send to self
-        //this.outputPartition = DataPartition.RANDOM;
-        this.children.addAll(planFragment.getChildren());
-    }
-
     public List<PlanFragment> getDestFragmentList() {
         return destNodeList.stream().map(PlanNode::getFragment).collect(Collectors.toList());
-    }
-
-    public ExchangeNode getDestNode(int index) {
-        return destNodeList.get(index);
-    }
-
-    public void createDataSink(TResultSinkType resultSinkType) {
-        if (sink != null) {
-            return;
-        }
-
-        Preconditions.checkState(!destNodeList.isEmpty(), "MultiCastPlanFragment don't support return result");
-
-        MultiCastDataSink multiCastDataSink = new MultiCastDataSink();
-        this.sink = multiCastDataSink;
-
-        for (ExchangeNode f : destNodeList) {
-            DataStreamSink streamSink = new DataStreamSink(f.getId());
-            streamSink.setPartition(DataPartition.RANDOM);
-            streamSink.setFragment(this);
-            //streamSink.setOutputColumnIds(f.getProjectList());
-            multiCastDataSink.getDataStreamSinks().add(streamSink);
-            multiCastDataSink.getDestinations().add(Lists.newArrayList());
-        }
     }
 }

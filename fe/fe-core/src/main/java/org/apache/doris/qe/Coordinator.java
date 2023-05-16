@@ -1398,7 +1398,6 @@ public class Coordinator {
 
             MultiCastPlanFragment multi = (MultiCastPlanFragment) params.fragment;
             Preconditions.checkState(multi.getSink() instanceof MultiCastDataSink);
-            // set # of senders
             MultiCastDataSink multiSink = (MultiCastDataSink) multi.getSink();
 
             for (int i = 0; i < multi.getDestFragmentList().size(); i++) {
@@ -1409,20 +1408,14 @@ public class Coordinator {
                     continue;
                 }
                 FragmentExecParams destParams = fragmentExecParamsMap.get(destFragment.getFragmentId());
-
-                // Set params for pipeline level shuffle.
-                // TODO: why no exec node partition type in doris
-                //multi.getDestNode(i).setPartitionType(params.fragment.getOutputPartition().getType());
-                //sink.setExchDop(destFragment.getPipelineDop());
+                // TODO: set consumer physical property inherited from producer
+                multi.getDestFragmentList().get(i).setOutputPartition(params.fragment.getOutputPartition());
 
                 PlanNodeId exchId = sink.getExchNodeId();
-                // MultiCastSink only send to itself, destination exchange only one senders
-                // and it's don't support sort-merge
                 Preconditions.checkState(!destParams.perExchNumSenders.containsKey(exchId.asInt()));
                 destParams.perExchNumSenders.put(exchId.asInt(), 1);
 
-                // TODO: needScheduleByShuffleJoin opt
-                // add destination host to this fragment's destination
+                // TODO: only support RANDOM/BROADCAST currently
                 for (int j = 0; j < destParams.instanceExecParams.size(); ++j) {
                     TPlanFragmentDestination dest = new TPlanFragmentDestination();
                     dest.fragment_instance_id = destParams.instanceExecParams.get(j).instanceId;

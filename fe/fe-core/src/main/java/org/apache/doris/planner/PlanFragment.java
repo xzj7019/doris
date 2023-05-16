@@ -122,7 +122,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // specification of how the output of this fragment is partitioned (i.e., how
     // it's sent to its destination);
     // if the output is UNPARTITIONED, it is being broadcast
-    private DataPartition outputPartition;
+    protected DataPartition outputPartition;
 
     // Whether query statistics is sent with every batch. In order to get the query
     // statistics correctly when query contains limit, it is necessary to send query
