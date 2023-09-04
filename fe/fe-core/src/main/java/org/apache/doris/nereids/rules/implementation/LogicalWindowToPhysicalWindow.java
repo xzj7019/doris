@@ -36,6 +36,7 @@ import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalWindow;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalWindow;
+import org.apache.doris.qe.ConnectContext;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -165,23 +166,32 @@ public class LogicalWindowToPhysicalWindow extends OneImplementationRuleFactory 
                 tempLogicalWindow.getLogicalProperties(),
                 root);
 
+        boolean isEnableTwoPhasePartitionTopn = ConnectContext.get() != null
+                && ConnectContext.get().getSessionVariable() != null
+                && ConnectContext.get().getSessionVariable().isEnableTwoPhasePartitionTopn();
+
         if (windowFrameGroup.partitionKeys.isEmpty() && requiredOrderKeys.isEmpty()) {
             return physicalWindow.withRequirePropertiesAndChild(RequireProperties.of(PhysicalProperties.GATHER), root);
-        }
-
-        // todo: WFGs in the same OKG only need same RequiredProperties
-        PhysicalProperties properties;
-        if (windowFrameGroup.partitionKeys.isEmpty()) {
-            properties = PhysicalProperties.GATHER.withOrderSpec(new OrderSpec(requiredOrderKeys));
+        } else if (isEnableTwoPhasePartitionTopn && !windowFrameGroup.partitionKeys.isEmpty()
+                && !requiredOrderKeys.isEmpty()) {
+            PhysicalProperties properties = PhysicalProperties.createHash(
+                    windowFrameGroup.partitionKeys, ShuffleType.REQUIRE);
+            RequireProperties requireProperties = RequireProperties.of(properties);
+            return physicalWindow.withRequirePropertiesAndChild(requireProperties, root);
         } else {
-            properties = PhysicalProperties.createHash(
-                windowFrameGroup.partitionKeys, ShuffleType.REQUIRE);
-            // requiredOrderKeys contain partitionKeys, so there is no need to check if requiredOrderKeys.isEmpty()
-            properties = properties.withOrderSpec(new OrderSpec(requiredOrderKeys));
+            // todo: WFGs in the same OKG only need same RequiredProperties
+            PhysicalProperties properties;
+            if (windowFrameGroup.partitionKeys.isEmpty()) {
+                properties = PhysicalProperties.GATHER.withOrderSpec(new OrderSpec(requiredOrderKeys));
+            } else {
+                properties = PhysicalProperties.createHash(
+                        windowFrameGroup.partitionKeys, ShuffleType.REQUIRE);
+                // requiredOrderKeys contain partitionKeys, so there is no need to check if requiredOrderKeys.isEmpty()
+                properties = properties.withOrderSpec(new OrderSpec(requiredOrderKeys));
+            }
+            RequireProperties requireProperties = RequireProperties.of(properties);
+            return physicalWindow.withRequirePropertiesAndChild(requireProperties, root);
         }
-
-        RequireProperties requireProperties = RequireProperties.of(properties);
-        return physicalWindow.withRequirePropertiesAndChild(requireProperties, root);
     }
 
     /* ********************************************************************************************

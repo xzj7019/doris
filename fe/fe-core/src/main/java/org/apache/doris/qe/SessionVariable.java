@@ -318,6 +318,8 @@ public class SessionVariable implements Serializable, Writable {
     public static final String EXTERNAL_AGG_PARTITION_BITS = "external_agg_partition_bits";
 
     public static final String ENABLE_TWO_PHASE_READ_OPT = "enable_two_phase_read_opt";
+
+    public static final String ENABLE_TWO_PHASE_PARTITION_TOPN = "enable_two_phase_partition_topn";
     public static final String TOPN_OPT_LIMIT_THRESHOLD = "topn_opt_limit_threshold";
 
     public static final String ENABLE_FILE_CACHE = "enable_file_cache";
@@ -946,6 +948,9 @@ public class SessionVariable implements Serializable, Writable {
     @VariableMgr.VarAttr(name = ENABLE_ELIMINATE_SORT_NODE)
     public boolean enableEliminateSortNode = true;
 
+    @VariableMgr.VarAttr(name = ENABLE_TWO_PHASE_PARTITION_TOPN)
+    public boolean isEnableTwoPhasePartitionTopn = true;
+
     @VariableMgr.VarAttr(name = INTERNAL_SESSION)
     public boolean internalSession = false;
 
@@ -1322,6 +1327,10 @@ public class SessionVariable implements Serializable, Writable {
 
     public void setEnableTwoPhaseReadOpt(boolean enable) {
         enableTwoPhaseReadOpt = enable;
+    }
+
+    public boolean isEnableTwoPhasePartitionTopn() {
+        return isEnableTwoPhasePartitionTopn;
     }
 
     public int getMaxExecutionTimeMS() {

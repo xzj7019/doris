@@ -17,11 +17,16 @@
 
 package org.apache.doris.nereids.rules.implementation;
 
+import org.apache.doris.nereids.properties.DistributionSpecHash.ShuffleType;
 import org.apache.doris.nereids.properties.OrderKey;
+import org.apache.doris.nereids.properties.PhysicalProperties;
+import org.apache.doris.nereids.properties.RequireProperties;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.nereids.trees.expressions.OrderExpression;
+import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPartitionTopN;
+import org.apache.doris.qe.ConnectContext;
 
 import com.google.common.collect.ImmutableList;
 
@@ -40,14 +45,52 @@ public class LogicalPartitionTopNToPhysicalPartitionTopN extends OneImplementati
                         .collect(ImmutableList.toImmutableList()) :
                     ImmutableList.of();
 
-            return new PhysicalPartitionTopN<>(
-                    partitionTopN.getFunction(),
-                    partitionTopN.getPartitionKeys(),
-                    orderKeys,
-                    partitionTopN.hasGlobalLimit(),
-                    partitionTopN.getPartitionLimit(),
-                    partitionTopN.getLogicalProperties(),
-                    partitionTopN.child());
+            RequireProperties requireAny = RequireProperties.of(PhysicalProperties.ANY);
+            RequireProperties requireGather = RequireProperties.of(PhysicalProperties.GATHER);
+
+            if (ConnectContext.get() == null || ConnectContext.get().getSessionVariable() == null
+                    || !ConnectContext.get().getSessionVariable().isEnableTwoPhasePartitionTopn()) {
+                PhysicalPartitionTopN<Plan> localPartitionTopN = new PhysicalPartitionTopN<>(
+                        partitionTopN.getFunction(),
+                        partitionTopN.getPartitionKeys(),
+                        orderKeys,
+                        partitionTopN.hasGlobalLimit(),
+                        partitionTopN.getPartitionLimit(),
+                        partitionTopN.getLogicalProperties(),
+                        requireAny,
+                        partitionTopN.child());
+
+                return localPartitionTopN;
+            } else {
+                PhysicalPartitionTopN<Plan> anyLocalPartitionTopN = new PhysicalPartitionTopN<>(
+                        partitionTopN.getFunction(),
+                        partitionTopN.getPartitionKeys(),
+                        orderKeys,
+                        partitionTopN.hasGlobalLimit(),
+                        partitionTopN.getPartitionLimit(),
+                        partitionTopN.getLogicalProperties(),
+                        requireAny,
+                        partitionTopN.child());
+
+                PhysicalPartitionTopN<Plan> anyLocalGatherGlobalPartitionTopN = new PhysicalPartitionTopN<>(
+                        partitionTopN.getFunction(),
+                        partitionTopN.getPartitionKeys(),
+                        orderKeys,
+                        partitionTopN.hasGlobalLimit(),
+                        partitionTopN.getPartitionLimit(),
+                        anyLocalPartitionTopN.getLogicalProperties(),
+                        requireGather,
+                        anyLocalPartitionTopN);
+
+                RequireProperties requireHash = RequireProperties.of(
+                        PhysicalProperties.createHash(partitionTopN.getPartitionKeys(), ShuffleType.REQUIRE));
+
+                PhysicalPartitionTopN<Plan> anyLocalHashGlobalPartitionTopN = anyLocalGatherGlobalPartitionTopN
+                        .withRequire(requireHash)
+                        .withPartitionExpressions(partitionTopN.getPartitionKeys());
+
+                return anyLocalHashGlobalPartitionTopN;
+            }
         }).toRule(RuleType.LOGICAL_PARTITION_TOP_N_TO_PHYSICAL_PARTITION_TOP_N_RULE);
     }
 }

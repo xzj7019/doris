@@ -173,6 +173,11 @@ public class PhysicalWindow<CHILD_TYPE extends Plan> extends PhysicalUnary<CHILD
                 getLogicalProperties(), physicalProperties, statistics, newChild);
     }
 
+    public <C extends Plan> PhysicalWindow<C> withoutRequirePropertiesAndChild(C newChild) {
+        return new PhysicalWindow<>(windowFrameGroup, requireProperties, windowExpressions, Optional.empty(),
+                getLogicalProperties(), physicalProperties, statistics, newChild);
+    }
+
     @Override
     public List<Slot> computeOutput() {
         return new ImmutableList.Builder<Slot>()

@@ -21,6 +21,8 @@ import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.properties.LogicalProperties;
 import org.apache.doris.nereids.properties.OrderKey;
 import org.apache.doris.nereids.properties.PhysicalProperties;
+import org.apache.doris.nereids.properties.RequireProperties;
+import org.apache.doris.nereids.properties.RequirePropertiesSupplier;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.plans.Plan;
@@ -42,18 +44,20 @@ import java.util.stream.Collectors;
 /**
  * Physical partition-top-N plan.
  */
-public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnary<CHILD_TYPE> implements PartitionTopN {
+public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnary<CHILD_TYPE>
+        implements PartitionTopN, RequirePropertiesSupplier<PhysicalPartitionTopN<CHILD_TYPE>> {
     private final WindowFuncType function;
     private final List<Expression> partitionKeys;
     private final List<OrderKey> orderKeys;
     private final Boolean hasGlobalLimit;
     private final long partitionLimit;
+    private final RequireProperties requireProperties;
 
     public PhysicalPartitionTopN(WindowFuncType function, List<Expression> partitionKeys, List<OrderKey> orderKeys,
-                                 Boolean hasGlobalLimit, long partitionLimit,
-                                 LogicalProperties logicalProperties, CHILD_TYPE child) {
+                                 Boolean hasGlobalLimit, long partitionLimit, LogicalProperties logicalProperties,
+                                 RequireProperties requireProperties, CHILD_TYPE child) {
         this(function, partitionKeys, orderKeys, hasGlobalLimit, partitionLimit,
-                Optional.empty(), logicalProperties, child);
+                Optional.empty(), logicalProperties, requireProperties, child);
     }
 
     /**
@@ -62,13 +66,14 @@ public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnar
     public PhysicalPartitionTopN(WindowFuncType function, List<Expression> partitionKeys, List<OrderKey> orderKeys,
                                  Boolean hasGlobalLimit, long partitionLimit,
                                  Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties,
-                                 CHILD_TYPE child) {
+                                 RequireProperties requireProperties, CHILD_TYPE child) {
         super(PlanType.PHYSICAL_PARTITION_TOP_N, groupExpression, logicalProperties, child);
         this.function = function;
         this.partitionKeys = ImmutableList.copyOf(partitionKeys);
         this.orderKeys = ImmutableList.copyOf(orderKeys);
         this.hasGlobalLimit = hasGlobalLimit;
         this.partitionLimit = partitionLimit;
+        this.requireProperties = Objects.requireNonNull(requireProperties, "requireProperties cannot be null");
     }
 
     /**
@@ -77,7 +82,8 @@ public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnar
     public PhysicalPartitionTopN(WindowFuncType function, List<Expression> partitionKeys, List<OrderKey> orderKeys,
                                  Boolean hasGlobalLimit, long partitionLimit,
                                  Optional<GroupExpression> groupExpression, LogicalProperties logicalProperties,
-                                 PhysicalProperties physicalProperties, Statistics statistics, CHILD_TYPE child) {
+                                 PhysicalProperties physicalProperties, Statistics statistics,
+                                 RequireProperties requireProperties, CHILD_TYPE child) {
         super(PlanType.PHYSICAL_PARTITION_TOP_N, groupExpression, logicalProperties, physicalProperties,
                 statistics, child);
         this.function = function;
@@ -85,6 +91,7 @@ public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnar
         this.orderKeys = orderKeys;
         this.hasGlobalLimit = hasGlobalLimit;
         this.partitionLimit = partitionLimit;
+        this.requireProperties = requireProperties;
     }
 
     public WindowFuncType getFunction() {
@@ -153,27 +160,32 @@ public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnar
         Preconditions.checkArgument(children.size() == 1);
         return new PhysicalPartitionTopN<>(function, partitionKeys, orderKeys, hasGlobalLimit,
                 partitionLimit, groupExpression, getLogicalProperties(), physicalProperties,
-                statistics, children.get(0));
+                statistics, requireProperties, children.get(0));
     }
 
     @Override
     public PhysicalPartitionTopN<CHILD_TYPE> withGroupExpression(Optional<GroupExpression> groupExpression) {
         return new PhysicalPartitionTopN<>(function, partitionKeys, orderKeys, hasGlobalLimit, partitionLimit,
-            groupExpression, getLogicalProperties(), child());
+            groupExpression, getLogicalProperties(), getRequireProperties(), child());
+    }
+
+    public PhysicalPartitionTopN<CHILD_TYPE> withPartitionExpressions(List<Expression> partitionExpressions) {
+        return new PhysicalPartitionTopN<>(function, partitionExpressions, orderKeys, hasGlobalLimit, partitionLimit,
+                groupExpression, getLogicalProperties(), getRequireProperties(), child());
     }
 
     @Override
     public Plan withGroupExprLogicalPropChildren(Optional<GroupExpression> groupExpression,
             Optional<LogicalProperties> logicalProperties, List<Plan> children) {
         return new PhysicalPartitionTopN<>(function, partitionKeys, orderKeys, hasGlobalLimit, partitionLimit,
-                groupExpression, logicalProperties.get(), children.get(0));
+                groupExpression, logicalProperties.get(), requireProperties, children.get(0));
     }
 
     @Override
     public PhysicalPartitionTopN<CHILD_TYPE> withPhysicalPropertiesAndStats(PhysicalProperties physicalProperties,
                                                                             Statistics statistics) {
         return new PhysicalPartitionTopN<>(function, partitionKeys, orderKeys, hasGlobalLimit, partitionLimit,
-            groupExpression, getLogicalProperties(), physicalProperties, statistics, child());
+            groupExpression, getLogicalProperties(), physicalProperties, statistics, requireProperties, child());
     }
 
     @Override
@@ -196,6 +208,24 @@ public class PhysicalPartitionTopN<CHILD_TYPE extends Plan> extends PhysicalUnar
     @Override
     public PhysicalPartitionTopN<CHILD_TYPE> resetLogicalProperties() {
         return new PhysicalPartitionTopN<>(function, partitionKeys, orderKeys, hasGlobalLimit, partitionLimit,
-            groupExpression, null, physicalProperties, statistics, child());
+            groupExpression, null, physicalProperties, statistics, requireProperties, child());
+    }
+
+    @Override
+    public RequireProperties getRequireProperties() {
+        return requireProperties;
+    }
+
+    @Override
+    public PhysicalPartitionTopN<Plan> withRequireAndChildren(
+            RequireProperties requireProperties, List<Plan> children) {
+        Preconditions.checkArgument(children.size() == 1);
+        return withRequirePropertiesAndChild(requireProperties, children.get(0));
+    }
+
+    public <C extends Plan> PhysicalPartitionTopN<C> withRequirePropertiesAndChild(
+            RequireProperties requireProperties, C newChild) {
+        return new PhysicalPartitionTopN<>(function, partitionKeys, orderKeys, hasGlobalLimit, partitionLimit,
+                groupExpression, null, physicalProperties, statistics, requireProperties, newChild);
     }
 }
