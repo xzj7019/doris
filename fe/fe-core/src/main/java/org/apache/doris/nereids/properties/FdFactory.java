@@ -15,30 +15,29 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.nereids.trees.plans;
+package org.apache.doris.nereids.properties;
 
-import org.apache.doris.nereids.properties.FdItem;
-import org.apache.doris.nereids.properties.FunctionalDependencies;
+import org.apache.doris.catalog.TableIf;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
-import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.doris.catalog.Table;
 
-import java.util.List;
-import java.util.function.Supplier;
 
-/**
- * Block fd propagation, it always returns an empty fd
- */
-public interface BlockFuncDepsPropagation extends LogicalPlan {
-    @Override
-    default FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        return FunctionalDependencies.EMPTY_FUNC_DEPS;
+public class FdFactory {
+
+    public static final FdFactory INSTANCE = new FdFactory();
+
+    public TableFdItem createTableFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
+            ImmutableSet<TableIf> tableIds) {
+        TableFdItem fdItem = new TableFdItem(parentExprs, isUnique, tableIds);
+        return fdItem;
     }
 
-    @Override
-    default ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
-        return ImmutableSet.of();
+    public ExprFdItem createExprFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
+            ImmutableSet<NamedExpression> childExprs) {
+        ExprFdItem fdItem = new ExprFdItem(parentExprs, isUnique, childExprs);
+        return fdItem;
     }
 }

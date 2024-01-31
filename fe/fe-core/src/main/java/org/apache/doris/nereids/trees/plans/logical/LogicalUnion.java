@@ -18,6 +18,7 @@
 package org.apache.doris.nereids.trees.plans.logical;
 
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.properties.FdItem;
 import org.apache.doris.nereids.properties.FunctionalDependencies;
 import org.apache.doris.nereids.properties.LogicalProperties;
 import org.apache.doris.nereids.trees.expressions.Expression;
@@ -189,5 +190,10 @@ public class LogicalUnion extends LogicalSetOperation implements Union, OutputPr
         FunctionalDependencies.Builder builder = new FunctionalDependencies.Builder();
         builder.addUniqueSlot(ImmutableSet.copyOf(outputSupplier.get()));
         return builder.build();
+    }
+
+    @Override
+    public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
+        return ImmutableSet.of();
     }
 }

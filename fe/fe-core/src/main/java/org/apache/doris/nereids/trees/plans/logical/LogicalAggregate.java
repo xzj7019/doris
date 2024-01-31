@@ -18,9 +18,12 @@
 package org.apache.doris.nereids.trees.plans.logical;
 
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.properties.FdFactory;
+import org.apache.doris.nereids.properties.FdItem;
 import org.apache.doris.nereids.properties.FunctionalDependencies;
 import org.apache.doris.nereids.properties.FunctionalDependencies.Builder;
 import org.apache.doris.nereids.properties.LogicalProperties;
+import org.apache.doris.nereids.properties.TableFdItem;
 import org.apache.doris.nereids.trees.expressions.Alias;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
@@ -315,6 +318,20 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
                 && child().getLogicalProperties().getFunctionalDependencies().isUniqueAndNotNull(agg.getInputSlots())) {
             fdBuilder.addUniqueSlot(namedExpression.toSlot());
         }
+    }
+
+    @Override
+    public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
+        ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
+
+        ImmutableSet<NamedExpression> groupByExprs = getGroupByExpressions().stream().map(
+                e -> (NamedExpression)e
+        ).collect(ImmutableSet.toImmutableSet());
+        //groupByExprs.stream().map(e->e.getInputSlots().forEach(f->f.toSlot().))
+        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, false, ImmutableSet.of());
+        builder.add(fdItem);
+
+        return builder.build();
     }
 
     @Override

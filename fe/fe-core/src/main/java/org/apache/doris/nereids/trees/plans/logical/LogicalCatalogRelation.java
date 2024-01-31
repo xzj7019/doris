@@ -21,13 +21,18 @@ import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.DatabaseIf;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.catalog.OlapTable;
+import org.apache.doris.catalog.PrimitiveType;
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.datasource.CatalogIf;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.properties.FdFactory;
+import org.apache.doris.nereids.properties.FdItem;
 import org.apache.doris.nereids.properties.FunctionalDependencies;
 import org.apache.doris.nereids.properties.FunctionalDependencies.Builder;
 import org.apache.doris.nereids.properties.LogicalProperties;
+import org.apache.doris.nereids.properties.TableFdItem;
+import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.plans.PlanType;
@@ -155,5 +160,34 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
             fdBuilder.addUniqueSlot(slotSet);
         });
         return fdBuilder.build();
+    }
+
+    @Override
+    public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
+        Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
+        ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
+        table.getPrimaryKeyConstraints().forEach(c -> {
+            Set<Column> columns = c.getPrimaryKeys(this.getTable());
+            ImmutableSet<NamedExpression> slotSet = output.stream()
+                    .filter(SlotReference.class::isInstance)
+                    .map(SlotReference.class::cast)
+                    .filter(s -> s.getColumn().isPresent()
+                            && columns.contains(s.getColumn().get()))
+                    .collect(ImmutableSet.toImmutableSet());
+            TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet, true, ImmutableSet.of(table));
+            builder.add(tableFdItem);
+        });
+        table.getUniqueConstraints().forEach(c -> {
+            Set<Column> columns = c.getUniqueKeys(this.getTable());
+            ImmutableSet<NamedExpression> slotSet = output.stream()
+                    .filter(SlotReference.class::isInstance)
+                    .map(SlotReference.class::cast)
+                    .filter(s -> s.getColumn().isPresent()
+                            && columns.contains(s.getColumn().get()))
+                    .collect(ImmutableSet.toImmutableSet());
+            TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet, true, ImmutableSet.of(table));
+            builder.add(tableFdItem);
+        });
+        return builder.build();
     }
 }

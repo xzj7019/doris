@@ -21,6 +21,7 @@ import org.apache.doris.common.Pair;
 import org.apache.doris.nereids.hint.DistributeHint;
 import org.apache.doris.nereids.jobs.joinorder.hypergraph.bitmap.LongBitmap;
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.properties.FdItem;
 import org.apache.doris.nereids.properties.FunctionalDependencies;
 import org.apache.doris.nereids.properties.FunctionalDependencies.Builder;
 import org.apache.doris.nereids.properties.LogicalProperties;
@@ -30,6 +31,7 @@ import org.apache.doris.nereids.trees.expressions.EqualTo;
 import org.apache.doris.nereids.trees.expressions.ExprId;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.MarkJoinSlotReference;
+import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.plans.DistributeType;
 import org.apache.doris.nereids.trees.plans.JoinType;
@@ -444,6 +446,29 @@ public class LogicalJoin<LEFT_CHILD_TYPE extends Plan, RIGHT_CHILD_TYPE extends 
             }
         }
         return Pair.of(leftKeys, rightKeys);
+    }
+
+    @Override
+    public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
+        ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
+
+        ImmutableSet<FdItem> leftItems = left().getLogicalProperties().getFdItems();
+        ImmutableSet<FdItem> rightItems = right().getLogicalProperties().getFdItems();
+
+        leftItems.stream().forEach(e ->
+                e.setUnique(false)
+        );
+        rightItems.stream().forEach(e ->
+                e.setUnique(false)
+        );
+
+        if (joinType.isInnerJoin()) {
+            // inner join propagate uniforms slots
+            // And if the hash keys is unique, inner join can propagate all functional dependencies
+            builder.addAll(leftItems);
+            builder.addAll(rightItems);
+        }
+        return builder.build();
     }
 
     @Override
