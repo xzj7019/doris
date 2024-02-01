@@ -315,8 +315,8 @@ public class Rewriter extends AbstractBatchJobExecutor {
                     custom(RuleType.ELIMINATE_UNNECESSARY_PROJECT, EliminateUnnecessaryProject::new)
             ),
 
-            // this rule should invoke after infer predicate and push down distinct, and before push down limit
-            topic("eliminate group by keys according unique or foreign key",
+            // this rule should invoke after PullUpJoinFromUnionAll
+            topic("eliminate group by keys according fd information",
                     topDown(new EliminateGroupByKey())
             ),
 

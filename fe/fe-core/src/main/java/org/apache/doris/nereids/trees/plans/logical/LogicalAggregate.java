@@ -334,7 +334,8 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
         builder.addAll(childItems);
 
         // todo: fill the table sets
-        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, true, ImmutableSet.of());
+        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, true,
+                false, ImmutableSet.of());
         builder.add(fdItem);
 
         return builder.build();
