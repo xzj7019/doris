@@ -157,5 +157,7 @@ public class LogicalOneRowRelation extends LogicalRelation implements OneRowRela
                 .collect(ImmutableSet.toImmutableSet());
         ExprFdItem fdItem = FdFactory.INSTANCE.createExprFdItem(slotSet, true, slotSet);
         builder.add(fdItem);
+
+        return builder.build();
     }
 }

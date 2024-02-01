@@ -176,5 +176,6 @@ public class LogicalLimit<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_TY
             builder.add(fdItem);
             fdItems = builder.build();
         }
+        return fdItems;
     }
 }
