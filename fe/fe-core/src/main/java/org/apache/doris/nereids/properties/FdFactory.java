@@ -30,8 +30,8 @@ public class FdFactory {
     public static final FdFactory INSTANCE = new FdFactory();
 
     public TableFdItem createTableFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
-            ImmutableSet<TableIf> tableIds) {
-        TableFdItem fdItem = new TableFdItem(parentExprs, isUnique, tableIds);
+            boolean isCandidate, ImmutableSet<TableIf> tableIds) {
+        TableFdItem fdItem = new TableFdItem(parentExprs, isUnique, isCandidate, tableIds);
         return fdItem;
     }
 

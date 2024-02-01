@@ -28,7 +28,7 @@ public class ExprFdItem extends FdItem {
 
     public ExprFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
             ImmutableSet<NamedExpression> childExprs) {
-        super(parentExprs, isUnique);
+        super(parentExprs, isUnique, false);
         this.childExprs = ImmutableSet.copyOf(childExprs);
     }
 

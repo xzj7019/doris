@@ -174,19 +174,36 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
                     .filter(s -> s.getColumn().isPresent()
                             && columns.contains(s.getColumn().get()))
                     .collect(ImmutableSet.toImmutableSet());
-            TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet, true, ImmutableSet.of(table));
+            TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet, true, false, ImmutableSet.of(table));
             builder.add(tableFdItem);
         });
         table.getUniqueConstraints().forEach(c -> {
             Set<Column> columns = c.getUniqueKeys(this.getTable());
-            ImmutableSet<NamedExpression> slotSet = output.stream()
+            boolean allNotNull = columns.stream()
                     .filter(SlotReference.class::isInstance)
                     .map(SlotReference.class::cast)
-                    .filter(s -> s.getColumn().isPresent()
-                            && columns.contains(s.getColumn().get()))
-                    .collect(ImmutableSet.toImmutableSet());
-            TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet, true, ImmutableSet.of(table));
-            builder.add(tableFdItem);
+                    .allMatch(s -> !s.nullable());
+            if (allNotNull) {
+                ImmutableSet<NamedExpression> slotSet = output.stream()
+                        .filter(SlotReference.class::isInstance)
+                        .map(SlotReference.class::cast)
+                        .filter(s -> s.getColumn().isPresent()
+                                && columns.contains(s.getColumn().get()))
+                        .collect(ImmutableSet.toImmutableSet());
+                TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet,
+                        true, false, ImmutableSet.of(table));
+                builder.add(tableFdItem);
+            } else {
+                ImmutableSet<NamedExpression> slotSet = output.stream()
+                        .filter(SlotReference.class::isInstance)
+                        .map(SlotReference.class::cast)
+                        .filter(s -> s.getColumn().isPresent()
+                                && columns.contains(s.getColumn().get()))
+                        .collect(ImmutableSet.toImmutableSet());
+                TableFdItem tableFdItem = FdFactory.INSTANCE.createTableFdItem(slotSet,
+                        true, true, ImmutableSet.of(table));
+                builder.add(tableFdItem);
+            }
         });
         return builder.build();
     }

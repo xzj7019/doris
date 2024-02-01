@@ -53,7 +53,7 @@ public class EliminateGroupByKey extends OneRewriteRuleFactory {
             List<FdItem> uniqueFdItems = new ArrayList<>();
             List<FdItem> nonUniqueFdItems = new ArrayList<>();
             ImmutableSet<FdItem> fdItems =  agg.child().child(0).getLogicalProperties().getFdItems();
-            fdItems.stream().forEach( e-> {
+            fdItems.stream().filter(e -> !e.isCandidate()).forEach( e-> {
                     if (((FdItem) e).isUnique()) {
                         uniqueFdItems.add(e);
                     } else {

@@ -40,8 +40,8 @@ public class TableFdItem extends FdItem {
     private ImmutableSet<TableIf> childTables;
 
     public TableFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
-            ImmutableSet<TableIf> childTables) {
-        super(parentExprs, isUnique);
+            boolean isCandidate, ImmutableSet<TableIf> childTables) {
+        super(parentExprs, isUnique, isCandidate);
         this.childTables = ImmutableSet.copyOf(childTables);
     }
 

@@ -29,9 +29,20 @@ public class FdItem {
 
     boolean isUnique;
 
-    public FdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique) {
+    boolean isCandidate;
+
+    public FdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique, boolean isCandidate) {
         this.parentExprs = ImmutableSet.copyOf(parentExprs);
         this.isUnique = isUnique;
+        this.isCandidate = isCandidate;
+    }
+
+    public boolean isCandidate() {
+        return isCandidate;
+    }
+
+    public void setCandidate(boolean isCandidate) {
+        this.isCandidate = isCandidate;
     }
 
     public boolean isUnique() {
