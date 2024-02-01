@@ -18,6 +18,8 @@
 package org.apache.doris.nereids.trees.plans.logical;
 
 import org.apache.doris.nereids.memo.GroupExpression;
+import org.apache.doris.nereids.properties.ExprFdItem;
+import org.apache.doris.nereids.properties.FdFactory;
 import org.apache.doris.nereids.properties.FdItem;
 import org.apache.doris.nereids.properties.FunctionalDependencies;
 import org.apache.doris.nereids.properties.FunctionalDependencies.Builder;
@@ -133,7 +135,19 @@ public class LogicalDeferMaterializeTopN<CHILD_TYPE extends Plan> extends Logica
 
     @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
-        return ImmutableSet.of();
+        ImmutableSet<FdItem> fdItems = child(0).getLogicalProperties().getFdItems();
+        if (getLimit() == 1) {
+            ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
+            List<Slot> output = outputSupplier.get();
+            ImmutableSet<NamedExpression> slotSet = output.stream()
+                    .filter(SlotReference.class::isInstance)
+                    .map(SlotReference.class::cast)
+                    .collect(ImmutableSet.toImmutableSet());
+            ExprFdItem fdItem = FdFactory.INSTANCE.createExprFdItem(slotSet, true, slotSet);
+            builder.add(fdItem);
+            fdItems = builder.build();
+        }
+        return fdItems;
     }
 
     @Override

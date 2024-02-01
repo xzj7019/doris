@@ -48,6 +48,15 @@ public interface PropagateFuncDeps extends LogicalPlan {
 
     @Override
     default ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
-        return ImmutableSet.of();
+        if (children().size() == 1) {
+            // Note when changing function dependencies, we always clone it.
+            // So it's safe to return a reference
+            return child(0).getLogicalProperties().getFdItems();
+        }
+        ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
+        children().stream()
+                .map(p -> p.getLogicalProperties().getFdItems())
+                .forEach(builder::addAll);
+        return builder.build();
     }
 }

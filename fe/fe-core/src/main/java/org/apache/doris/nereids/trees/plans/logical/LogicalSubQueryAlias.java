@@ -180,6 +180,7 @@ public class LogicalSubQueryAlias<CHILD_TYPE extends Plan> extends LogicalUnary<
 
     @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
+        // TODO: inherit from child with replaceMap
         return ImmutableSet.of();
     }
 

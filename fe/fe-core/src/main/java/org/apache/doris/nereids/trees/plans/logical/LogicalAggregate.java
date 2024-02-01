@@ -321,27 +321,6 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
     }
 
     @Override
-    public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
-        ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
-
-        ImmutableSet<NamedExpression> groupByExprs = getGroupByExpressions().stream()
-                .filter(SlotReference.class::isInstance)
-                .map(SlotReference.class::cast)
-                .collect(ImmutableSet.toImmutableSet());
-
-        // inherit from child
-        ImmutableSet<FdItem> childItems = child().getLogicalProperties().getFdItems();
-        builder.addAll(childItems);
-
-        // todo: fill the table sets
-        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, true,
-                false, ImmutableSet.of());
-        builder.add(fdItem);
-
-        return builder.build();
-    }
-
-    @Override
     public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
         FunctionalDependencies childFd = child(0).getLogicalProperties().getFunctionalDependencies();
         Set<Slot> outputSet = new HashSet<>(outputSupplier.get());
@@ -385,5 +364,26 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
         fdBuilder.addUniqueSlot(groupByKeys);
         fdBuilder.pruneSlots(outputSet);
         return fdBuilder.build();
+    }
+
+    @Override
+    public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
+        ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
+
+        ImmutableSet<NamedExpression> groupByExprs = getGroupByExpressions().stream()
+                .filter(SlotReference.class::isInstance)
+                .map(SlotReference.class::cast)
+                .collect(ImmutableSet.toImmutableSet());
+
+        // inherit from child
+        ImmutableSet<FdItem> childItems = child().getLogicalProperties().getFdItems();
+        builder.addAll(childItems);
+
+        // todo: fill the table sets
+        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, true,
+                false, ImmutableSet.of());
+        builder.add(fdItem);
+
+        return builder.build();
     }
 }
