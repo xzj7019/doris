@@ -324,11 +324,17 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
 
-        ImmutableSet<NamedExpression> groupByExprs = getGroupByExpressions().stream().map(
-                e -> (NamedExpression)e
-        ).collect(ImmutableSet.toImmutableSet());
-        //groupByExprs.stream().map(e->e.getInputSlots().forEach(f->f.toSlot().))
-        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, false, ImmutableSet.of());
+        ImmutableSet<NamedExpression> groupByExprs = getGroupByExpressions().stream()
+                .filter(SlotReference.class::isInstance)
+                .map(SlotReference.class::cast)
+                .collect(ImmutableSet.toImmutableSet());
+
+        // inherit from child
+        ImmutableSet<FdItem> childItems = child().getLogicalProperties().getFdItems();
+        builder.addAll(childItems);
+
+        // todo: fill the table sets
+        TableFdItem fdItem = FdFactory.INSTANCE.createTableFdItem(groupByExprs, true, ImmutableSet.of());
         builder.add(fdItem);
 
         return builder.build();

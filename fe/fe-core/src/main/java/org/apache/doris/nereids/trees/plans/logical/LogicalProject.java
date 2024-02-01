@@ -255,11 +255,6 @@ public class LogicalProject<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
 
         ImmutableSet<FdItem> childItems = child().getLogicalProperties().getFdItems();
-
-        childItems.stream().forEach(e ->
-                e.setUnique(false)
-        );
-
         builder.addAll(childItems);
 
         return builder.build();
