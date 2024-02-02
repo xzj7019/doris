@@ -183,16 +183,6 @@ public class LogicalRepeat<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_T
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        FunctionalDependencies.Builder builder = new FunctionalDependencies.Builder();
-        // Note uniform does not reject nullable slots
-        outputSupplier.get().stream()
-                .filter(child(0).getLogicalProperties().getFunctionalDependencies()::isUniform)
-                .forEach(builder::addUniformSlot);
-        return builder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
 

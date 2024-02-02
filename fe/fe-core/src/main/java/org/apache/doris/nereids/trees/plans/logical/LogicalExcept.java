@@ -109,25 +109,6 @@ public class LogicalExcept extends LogicalSetOperation {
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        FunctionalDependencies.Builder builder = new FunctionalDependencies
-                .Builder(child(0).getLogicalProperties().getFunctionalDependencies());
-        Map<Slot, Slot> replaceMap = new HashMap<>();
-        List<Slot> output = outputSupplier.get();
-        List<? extends Slot> originalOutputs = regularChildrenOutputs.isEmpty()
-                ? child(0).getOutput()
-                : regularChildrenOutputs.get(0);
-        for (int i = 0; i < output.size(); i++) {
-            replaceMap.put(originalOutputs.get(i), output.get(i));
-        }
-        builder.replace(replaceMap);
-        if (qualifier == Qualifier.DISTINCT) {
-            builder.addUniqueSlot(ImmutableSet.copyOf(outputSupplier.get()));
-        }
-        return builder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();

@@ -33,20 +33,6 @@ import java.util.function.Supplier;
  */
 public interface PropagateFuncDeps extends LogicalPlan {
     @Override
-    default FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        if (children().size() == 1) {
-            // Note when changing function dependencies, we always clone it.
-            // So it's safe to return a reference
-            return child(0).getLogicalProperties().getFunctionalDependencies();
-        }
-        FunctionalDependencies.Builder builder = new FunctionalDependencies.Builder();
-        children().stream()
-                .map(p -> p.getLogicalProperties().getFunctionalDependencies())
-                .forEach(builder::addFunctionalDependencies);
-        return builder.build();
-    }
-
-    @Override
     default ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         if (children().size() == 1) {
             // Note when changing function dependencies, we always clone it.

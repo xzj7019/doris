@@ -138,16 +138,6 @@ public class LogicalOneRowRelation extends LogicalRelation implements OneRowRela
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        FunctionalDependencies.Builder builder = new FunctionalDependencies.Builder();
-        outputSupplier.get().forEach(s -> {
-            builder.addUniformSlot(s);
-            builder.addUniqueSlot(s);
-        });
-        return builder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();

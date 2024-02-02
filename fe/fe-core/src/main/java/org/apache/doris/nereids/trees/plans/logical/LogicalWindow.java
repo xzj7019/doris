@@ -282,16 +282,6 @@ public class LogicalWindow<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_T
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        FunctionalDependencies.Builder builder = new FunctionalDependencies.Builder(
-                child(0).getLogicalProperties().getFunctionalDependencies());
-        for (NamedExpression namedExpression : windowExpressions) {
-            updateFuncDepsByWindowExpr(namedExpression, builder);
-        }
-        return builder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
         ImmutableSet<FdItem> childItems = child().getLogicalProperties().getFdItems();

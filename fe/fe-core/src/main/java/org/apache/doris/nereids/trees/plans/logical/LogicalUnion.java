@@ -186,16 +186,6 @@ public class LogicalUnion extends LogicalSetOperation implements Union, OutputPr
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        if (qualifier != Qualifier.DISTINCT) {
-            return FunctionalDependencies.EMPTY_FUNC_DEPS;
-        }
-        FunctionalDependencies.Builder builder = new FunctionalDependencies.Builder();
-        builder.addUniqueSlot(ImmutableSet.copyOf(outputSupplier.get()));
-        return builder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();

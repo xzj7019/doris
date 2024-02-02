@@ -127,42 +127,6 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        Builder fdBuilder = new Builder();
-        Set<Slot> output = ImmutableSet.copyOf(outputSupplier.get());
-        if (table instanceof OlapTable && ((OlapTable) table).getKeysType().isAggregationFamily()) {
-            ImmutableSet<Slot> slotSet = output.stream()
-                    .filter(SlotReference.class::isInstance)
-                    .map(SlotReference.class::cast)
-                    .filter(s -> s.getColumn().isPresent()
-                            && s.getColumn().get().isKey())
-                    .collect(ImmutableSet.toImmutableSet());
-            fdBuilder.addUniqueSlot(slotSet);
-        }
-        table.getPrimaryKeyConstraints().forEach(c -> {
-            Set<Column> columns = c.getPrimaryKeys(this.getTable());
-            ImmutableSet<Slot> slotSet = output.stream()
-                    .filter(SlotReference.class::isInstance)
-                    .map(SlotReference.class::cast)
-                    .filter(s -> s.getColumn().isPresent()
-                            && columns.contains(s.getColumn().get()))
-                    .collect(ImmutableSet.toImmutableSet());
-            fdBuilder.addUniqueSlot(slotSet);
-        });
-        table.getUniqueConstraints().forEach(c -> {
-            Set<Column> columns = c.getUniqueKeys(this.getTable());
-            ImmutableSet<Slot> slotSet = output.stream()
-                    .filter(SlotReference.class::isInstance)
-                    .map(SlotReference.class::cast)
-                    .filter(s -> s.getColumn().isPresent()
-                            && columns.contains(s.getColumn().get()))
-                    .collect(ImmutableSet.toImmutableSet());
-            fdBuilder.addUniqueSlot(slotSet);
-        });
-        return fdBuilder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();

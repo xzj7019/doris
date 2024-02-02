@@ -166,19 +166,6 @@ public class LogicalSubQueryAlias<CHILD_TYPE extends Plan> extends LogicalUnary<
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        FunctionalDependencies.Builder builder = new FunctionalDependencies
-                .Builder(child(0).getLogicalProperties().getFunctionalDependencies());
-        Map<Slot, Slot> replaceMap = new HashMap<>();
-        List<Slot> outputs = outputSupplier.get();
-        for (int i = 0; i < outputs.size(); i++) {
-            replaceMap.put(child(0).getOutput().get(i), outputs.get(i));
-        }
-        builder.replace(replaceMap);
-        return builder.build();
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         // TODO: inherit from child with replaceMap
         return ImmutableSet.of();

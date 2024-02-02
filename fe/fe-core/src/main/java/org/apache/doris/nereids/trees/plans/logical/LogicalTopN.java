@@ -159,19 +159,6 @@ public class LogicalTopN<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_TYP
     }
 
     @Override
-    public FunctionalDependencies computeFuncDeps(Supplier<List<Slot>> outputSupplier) {
-        FunctionalDependencies fd = child(0).getLogicalProperties().getFunctionalDependencies();
-        if (getLimit() == 1) {
-            Builder builder = new Builder();
-            List<Slot> output = outputSupplier.get();
-            output.forEach(builder::addUniformSlot);
-            output.forEach(builder::addUniqueSlot);
-            fd = builder.build();
-        }
-        return fd;
-    }
-
-    @Override
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         ImmutableSet<FdItem> fdItems = child(0).getLogicalProperties().getFdItems();
         if (getLimit() == 1) {
