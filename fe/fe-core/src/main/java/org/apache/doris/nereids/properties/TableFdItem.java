@@ -19,11 +19,11 @@ package org.apache.doris.nereids.properties;
 
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.nereids.trees.expressions.Alias;
-import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.plans.logical.LogicalCatalogRelation;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalProject;
 
 import com.google.common.collect.ImmutableSet;
@@ -33,37 +33,38 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 public class TableFdItem extends FdItem {
 
     private ImmutableSet<TableIf> childTables;
 
-    public TableFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
+    public TableFdItem(ImmutableSet<SlotReference> parentExprs, boolean isUnique,
             boolean isCandidate, ImmutableSet<TableIf> childTables) {
         super(parentExprs, isUnique, isCandidate);
         this.childTables = ImmutableSet.copyOf(childTables);
     }
 
     @Override
-    public boolean checkExprInChild(Expression slot, LogicalProject project) {
-        NamedExpression slotInProject = null;
-        List<NamedExpression> projectList = project.getProjects();
-        for (NamedExpression expr : projectList) {
-            if (expr.getExprId().equals(((SlotReference)slot).getExprId())) {
-                slotInProject = expr;
+    public boolean checkExprInChild(SlotReference slot, LogicalPlan childPlan) {
+        NamedExpression slotInChild = null;
+        List<NamedExpression> exprList = ((LogicalProject) childPlan).getProjects();
+        for (NamedExpression expr : exprList) {
+            if (expr.getExprId().equals(slot.getExprId())) {
+                slotInChild = expr;
                 break;
             }
         }
-        if (slotInProject != null) {
+        if (slotInChild != null) {
             Set<Slot> slotSet = new HashSet<>();
-            if (slotInProject instanceof Alias) {
-                slotSet = ((Alias) slotInProject).getInputSlots();
+            if (slotInChild instanceof Alias) {
+                slotSet = ((Alias) slotInChild).getInputSlots();
             } else {
-                slotSet.add((Slot)slotInProject);
+                slotSet.add((SlotReference) slotInChild);
             }
             // get table list from slotSet
-            Set<TableIf> tableSets = getTableIds(slotSet, project);
+            Set<TableIf> tableSets = getTableIds(slotSet, childPlan);
             if (childTables.containsAll(tableSets)) {
                 return true;
             } else {
@@ -74,12 +75,12 @@ public class TableFdItem extends FdItem {
         }
     }
 
-    private Set<TableIf> getTableIds(Set<Slot> slotSet, LogicalProject project) {
+    private Set<TableIf> getTableIds(Set<Slot> slotSet, LogicalPlan project) {
         List<LogicalCatalogRelation> tableList = getTableListUnderProject(project);
         Set<TableIf> resultSet = new HashSet<>();
         for (Slot slot : slotSet) {
             for (LogicalCatalogRelation table : tableList) {
-                if (table.getOutputExprIds().contains(((SlotReference)slot).getExprId())) {
+                if (table.getOutputExprIds().contains(slot.getExprId())) {
                     resultSet.add(table.getTable());
                 }
             }
@@ -87,7 +88,7 @@ public class TableFdItem extends FdItem {
         return resultSet;
     }
 
-    private List<LogicalCatalogRelation> getTableListUnderProject(LogicalProject project) {
+    private List<LogicalCatalogRelation> getTableListUnderProject(LogicalPlan project) {
         List<LogicalCatalogRelation> tableLists = new ArrayList<>();
         tableLists.addAll((Collection<? extends LogicalCatalogRelation>) project
                 .collect(LogicalCatalogRelation.class::isInstance));

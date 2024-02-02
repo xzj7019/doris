@@ -138,7 +138,7 @@ public class LogicalIntersect extends LogicalSetOperation {
         Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
 
-        ImmutableSet<NamedExpression> exprs = output.stream()
+        ImmutableSet<SlotReference> exprs = output.stream()
                 .filter(SlotReference.class::isInstance)
                 .map(SlotReference.class::cast)
                 .collect(ImmutableSet.toImmutableSet());

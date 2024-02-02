@@ -17,23 +17,24 @@
 
 package org.apache.doris.nereids.properties;
 
-import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
-import org.apache.doris.nereids.trees.plans.logical.LogicalProject;
+import org.apache.doris.nereids.trees.expressions.Slot;
+import org.apache.doris.nereids.trees.expressions.SlotReference;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 
 import com.google.common.collect.ImmutableSet;
 
 public class ExprFdItem extends FdItem {
-    private ImmutableSet<NamedExpression> childExprs;
+    private ImmutableSet<SlotReference> childExprs;
 
-    public ExprFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
-            ImmutableSet<NamedExpression> childExprs) {
+    public ExprFdItem(ImmutableSet<SlotReference> parentExprs, boolean isUnique,
+            ImmutableSet<SlotReference> childExprs) {
         super(parentExprs, isUnique, false);
         this.childExprs = ImmutableSet.copyOf(childExprs);
     }
 
     @Override
-    public boolean checkExprInChild(Expression slot, LogicalProject project) {
+    public boolean checkExprInChild(SlotReference slot, LogicalPlan childPlan) {
         return childExprs.contains(slot);
     }
 }

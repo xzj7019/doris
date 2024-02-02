@@ -151,7 +151,7 @@ public class LogicalOneRowRelation extends LogicalRelation implements OneRowRela
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         Set<NamedExpression> output = ImmutableSet.copyOf(outputSupplier.get());
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
-        ImmutableSet<NamedExpression> slotSet = output.stream()
+        ImmutableSet<SlotReference> slotSet = output.stream()
                 .filter(SlotReference.class::isInstance)
                 .map(SlotReference.class::cast)
                 .collect(ImmutableSet.toImmutableSet());

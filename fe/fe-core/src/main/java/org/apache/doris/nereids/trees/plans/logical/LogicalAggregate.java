@@ -370,7 +370,7 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
     public ImmutableSet<FdItem> computeFdItems(Supplier<List<Slot>> outputSupplier) {
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
 
-        ImmutableSet<NamedExpression> groupByExprs = getGroupByExpressions().stream()
+        ImmutableSet<SlotReference> groupByExprs = getGroupByExpressions().stream()
                 .filter(SlotReference.class::isInstance)
                 .map(SlotReference.class::cast)
                 .collect(ImmutableSet.toImmutableSet());

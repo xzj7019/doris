@@ -17,21 +17,22 @@
 
 package org.apache.doris.nereids.properties;
 
-import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
-import org.apache.doris.nereids.trees.plans.logical.LogicalProject;
+import org.apache.doris.nereids.trees.expressions.Slot;
+import org.apache.doris.nereids.trees.expressions.SlotReference;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 
 import com.google.common.collect.ImmutableSet;
 
 
 public class FdItem {
-    private ImmutableSet<NamedExpression> parentExprs;
+    private ImmutableSet<SlotReference> parentExprs;
 
     boolean isUnique;
 
     boolean isCandidate;
 
-    public FdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique, boolean isCandidate) {
+    public FdItem(ImmutableSet<SlotReference> parentExprs, boolean isUnique, boolean isCandidate) {
         this.parentExprs = ImmutableSet.copyOf(parentExprs);
         this.isUnique = isUnique;
         this.isCandidate = isCandidate;
@@ -53,15 +54,11 @@ public class FdItem {
         this.isUnique = isUnique;
     }
 
-    public ImmutableSet<NamedExpression> getParentExprs() {
+    public ImmutableSet<SlotReference> getParentExprs() {
         return parentExprs;
     }
 
-    public void setParentExprs(ImmutableSet<NamedExpression> parentExprs) {
-        this.parentExprs = ImmutableSet.copyOf(parentExprs);
-    }
-
-    public boolean checkExprInChild(Expression slot, LogicalProject project) {
+    public boolean checkExprInChild(SlotReference slot, LogicalPlan childPlan) {
         return false;
     }
 }

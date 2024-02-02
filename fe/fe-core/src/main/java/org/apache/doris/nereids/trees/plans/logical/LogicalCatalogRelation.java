@@ -168,7 +168,7 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
         ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
         table.getPrimaryKeyConstraints().forEach(c -> {
             Set<Column> columns = c.getPrimaryKeys(this.getTable());
-            ImmutableSet<NamedExpression> slotSet = output.stream()
+            ImmutableSet<SlotReference> slotSet = output.stream()
                     .filter(SlotReference.class::isInstance)
                     .map(SlotReference.class::cast)
                     .filter(s -> s.getColumn().isPresent()
@@ -184,7 +184,7 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
                     .map(SlotReference.class::cast)
                     .allMatch(s -> !s.nullable());
             if (allNotNull) {
-                ImmutableSet<NamedExpression> slotSet = output.stream()
+                ImmutableSet<SlotReference> slotSet = output.stream()
                         .filter(SlotReference.class::isInstance)
                         .map(SlotReference.class::cast)
                         .filter(s -> s.getColumn().isPresent()
@@ -194,7 +194,7 @@ public abstract class LogicalCatalogRelation extends LogicalRelation implements 
                         true, false, ImmutableSet.of(table));
                 builder.add(tableFdItem);
             } else {
-                ImmutableSet<NamedExpression> slotSet = output.stream()
+                ImmutableSet<SlotReference> slotSet = output.stream()
                         .filter(SlotReference.class::isInstance)
                         .map(SlotReference.class::cast)
                         .filter(s -> s.getColumn().isPresent()

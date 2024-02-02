@@ -17,26 +17,28 @@
 
 package org.apache.doris.nereids.properties;
 
+import org.apache.doris.analysis.SlotRef;
 import org.apache.doris.catalog.TableIf;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.doris.catalog.Table;
+import org.apache.doris.nereids.trees.expressions.SlotReference;
 
 
 public class FdFactory {
 
     public static final FdFactory INSTANCE = new FdFactory();
 
-    public TableFdItem createTableFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
+    public TableFdItem createTableFdItem(ImmutableSet<SlotReference> parentExprs, boolean isUnique,
             boolean isCandidate, ImmutableSet<TableIf> tableIds) {
         TableFdItem fdItem = new TableFdItem(parentExprs, isUnique, isCandidate, tableIds);
         return fdItem;
     }
 
-    public ExprFdItem createExprFdItem(ImmutableSet<NamedExpression> parentExprs, boolean isUnique,
-            ImmutableSet<NamedExpression> childExprs) {
+    public ExprFdItem createExprFdItem(ImmutableSet<SlotReference> parentExprs, boolean isUnique,
+            ImmutableSet<SlotReference> childExprs) {
         ExprFdItem fdItem = new ExprFdItem(parentExprs, isUnique, childExprs);
         return fdItem;
     }

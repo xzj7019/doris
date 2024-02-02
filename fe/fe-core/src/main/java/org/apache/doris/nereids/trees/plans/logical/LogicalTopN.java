@@ -177,7 +177,7 @@ public class LogicalTopN<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_TYP
         if (getLimit() == 1) {
             ImmutableSet.Builder<FdItem> builder = ImmutableSet.builder();
             List<Slot> output = outputSupplier.get();
-            ImmutableSet<NamedExpression> slotSet = output.stream()
+            ImmutableSet<SlotReference> slotSet = output.stream()
                     .filter(SlotReference.class::isInstance)
                     .map(SlotReference.class::cast)
                     .collect(ImmutableSet.toImmutableSet());
