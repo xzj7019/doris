@@ -17,18 +17,24 @@
 
 package org.apache.doris.nereids.rules.implementation;
 
+import org.apache.doris.nereids.memo.Group;
 import org.apache.doris.nereids.properties.OrderKey;
 import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
+import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.OrderExpression;
 import org.apache.doris.nereids.trees.plans.PartitionTopnPhase;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPartitionTopN;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPartitionTopN;
+import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.statistics.ColumnStatistic;
+import org.apache.doris.statistics.Statistics;
 
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Implementation rule that convert logical partition-top-n to physical partition-top-n.
@@ -42,7 +48,8 @@ public class LogicalPartitionTopNToPhysicalPartitionTopN extends OneImplementati
 
     private List<PhysicalPartitionTopN<? extends Plan>> generatePhysicalPartitionTopn(
             LogicalPartitionTopN<? extends Plan> logicalPartitionTopN) {
-        if (logicalPartitionTopN.getPartitionKeys().isEmpty()) {
+        if (logicalPartitionTopN.getPartitionKeys().isEmpty()
+                || !checkTwoPhaseGlobalPartitionTopn(logicalPartitionTopN)) {
             // if no partition by keys, use local partition topn combined with further full sort
             List<OrderKey> orderKeys = !logicalPartitionTopN.getOrderKeys().isEmpty()
                     ? logicalPartitionTopN.getOrderKeys().stream()
@@ -96,6 +103,46 @@ public class LogicalPartitionTopNToPhysicalPartitionTopN extends OneImplementati
                     twoPhaseLocalPartitionTopN);
 
             return ImmutableList.of(onePhaseGlobalPartitionTopN, twoPhaseGlobalPartitionTopN);
+        }
+    }
+
+    /**
+     * check if partition keys' ndv is almost near the total row count.
+     * if yes, it is not suitable for two phase global partition topn.
+     */
+    private boolean checkTwoPhaseGlobalPartitionTopn(LogicalPartitionTopN<? extends Plan> logicalPartitionTopN) {
+        logicalPartitionTopN.getGroupExpression().get().getOwnerGroup().getStatistics();
+        int globalPartitionTopnThreshold = ConnectContext.get().getSessionVariable().getGlobalPartitionTopNThreshold();
+        if (logicalPartitionTopN.getGroupExpression().isPresent()) {
+            Group group = logicalPartitionTopN.getGroupExpression().get().getOwnerGroup();
+            if (group != null && group.getStatistics() != null) {
+                Statistics stats = group.getStatistics();
+                double rowCount = stats.getRowCount();
+                List<Expression> partitionKeys = logicalPartitionTopN.getPartitionKeys();
+                List<ColumnStatistic> partitionByKeyStats = partitionKeys.stream()
+                        .map(partitionKey -> {
+                            ColumnStatistic partitionKeyStats = stats.findColumnStatistics(partitionKey);
+                            if (partitionKeyStats == null || partitionKeyStats.isUnKnown) {
+                                partitionKeyStats = null;
+                            }
+                            return partitionKeyStats;
+                        }).collect(Collectors.toList());
+                if (partitionByKeyStats.isEmpty() || partitionByKeyStats.contains(null)) {
+                    return false;
+                } else {
+                    double maxNdv = partitionByKeyStats.stream().map(s -> s.ndv)
+                            .max(Double::compare).get();
+                    if (rowCount / maxNdv >= globalPartitionTopnThreshold) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false;
         }
     }
 
