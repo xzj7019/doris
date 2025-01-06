@@ -51,6 +51,7 @@ import org.apache.doris.nereids.rules.exploration.mv.MaterializationContext;
 import org.apache.doris.nereids.stats.StatsCalculator;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
+import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.ComputeResultSet;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.algebra.CatalogRelation;
@@ -67,6 +68,8 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalRelation;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalSqlCache;
 import org.apache.doris.nereids.trees.plans.physical.TopnFilter;
 import org.apache.doris.planner.PlanFragment;
+import org.apache.doris.planner.PlanNode;
+import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.planner.Planner;
 import org.apache.doris.planner.RuntimeFilter;
 import org.apache.doris.planner.ScanNode;
@@ -289,7 +292,13 @@ public class NereidsPlanner extends Planner {
         // serialize optimized plan to dumpfile, dumpfile do not have this part means optimize failed
         MinidumpUtils.serializeOutputToDumpFile(physicalPlan);
         NereidsTracer.output(statementContext.getConnectContext());
-
+        // hbo related
+        if (statementContext.getConnectContext().getExecutor() != null
+            && statementContext.getConnectContext().getExecutor()
+                .getHistoryBasedPlanStatisticsTracker() != null) {
+            statementContext.getConnectContext().getExecutor()
+                    .getHistoryBasedPlanStatisticsTracker().setContext(cascadesContext, physicalPlan);
+        }
         return physicalPlan;
     }
 
@@ -417,6 +426,26 @@ public class NereidsPlanner extends Planner {
             statementContext.getConnectContext().getExecutor().getSummaryProfile().setNereidsOptimizeTime();
         }
     }
+    private void collectExecStatsIds(PhysicalPlan root, PlanFragment fragment,
+            PlanTranslatorContext context) {
+        if (ConnectContext.get() == null || cascadesContext == null) {
+            return;
+        }
+        if (!ConnectContext.get().getSessionVariable().isEnableHboTracker()) {
+            return;
+        }
+        for (Object child : root.children()) {
+            collectExecStatsIds((PhysicalPlan) child, fragment, context);
+        }
+        if (root.needCollectExecStats() && root instanceof AbstractPlan) {
+            int nodeId = ((AbstractPlan) root).getId();
+            PlanNodeId planId = context.getNereidsIdToPlanNodeIdMap().get(nodeId);
+            if (planId != null) {
+                fragment.getCollectExecStatsIds().add(planId.asInt());
+                cascadesContext.getNeedStatsPlanIdNodeMap().put(planId.asInt(), root);
+            }
+        }
+    }
 
     protected void splitFragments(PhysicalPlan resultPlan) {
         if (resultPlan instanceof PhysicalSqlCache) {
@@ -437,7 +466,7 @@ public class NereidsPlanner extends Planner {
             return;
         }
         PlanFragment root = physicalPlanTranslator.translatePlan(physicalPlan);
-
+        collectExecStatsIds(physicalPlan, root, planTranslatorContext);
         scanNodeList.addAll(planTranslatorContext.getScanNodes());
         physicalRelations.addAll(planTranslatorContext.getPhysicalRelations());
         descTable = planTranslatorContext.getDescTable();
