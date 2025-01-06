@@ -17,8 +17,13 @@
 
 package org.apache.doris.nereids.stats;
 
+import org.apache.doris.common.Config;
+import org.apache.doris.common.ThreadPoolManager;
 import org.apache.doris.common.profile.ProfileManager;
+import org.apache.doris.common.util.MasterDaemon;
+import org.apache.doris.statistics.HistoryBasedIdToPlanMapProvider;
 import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
+import org.apache.doris.statistics.InMemoryHistoryBasedPlanStatisticsProvider;
 
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,20 +32,54 @@ import static java.util.Objects.requireNonNull;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.ExecutorService;
+
 public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
-{
     private static final Logger LOG = LogManager.getLogger(HistoryBasedPlanStatisticsManager.class);
     private static volatile HistoryBasedPlanStatisticsManager INSTANCE = null;
-
-
     private final HistoryBasedStatisticsCacheManager historyBasedStatisticsCacheManager;
-    private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
+    //private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
     private HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider;
 
-    public HistoryBasedPlanStatisticsManager()
+    private HistoryBasedIdToPlanMapProvider historyBasedIdToPlanMapProvider;
+    private final ExecutorService hboExecutor;
+
+    HistoryBasedPlanStatisticsManager()
     {
-        this.historyBasedStatisticsCacheManager = new HistoryBasedStatisticsCacheManager();
-        this.planCanonicalInfoProvider = new CachingPlanCanonicalInfoProvider(historyBasedStatisticsCacheManager, newObjectMapper, metadata);
+        super("hbo-manager", 1 * 1000);
+        historyBasedPlanStatisticsProvider = new InMemoryHistoryBasedPlanStatisticsProvider();
+        hboExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
+                20, 100, "hbo-thread-pool", true);
+        historyBasedStatisticsCacheManager = new HistoryBasedStatisticsCacheManager();
+        historyBasedIdToPlanMapProvider = new HistoryBasedIdToPlanMapProvider();
+        //planCanonicalInfoProvider = new CachingPlanCanonicalInfoProvider(historyBasedStatisticsCacheManager, newObjectMapper, metadata);
     }
+
+    public static HistoryBasedPlanStatisticsManager getInstance() {
+        if (INSTANCE == null) {
+            synchronized (HistoryBasedPlanStatisticsManager.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new HistoryBasedPlanStatisticsManager();
+                    INSTANCE.start();
+                }
+            }
+        }
+        return INSTANCE;
+    }
+
+    public HistoryBasedPlanStatisticsProvider getHistoryBasedPlanStatisticsProvider() {
+        return historyBasedPlanStatisticsProvider;
+    }
+
+    public HistoryBasedStatisticsCacheManager getHistoryBasedStatisticsCacheManager() {
+        return historyBasedStatisticsCacheManager;
+    }
+
+    public HistoryBasedIdToPlanMapProvider getHistoryBasedIdToPlanMapProvider() {
+        return historyBasedIdToPlanMapProvider;
+    }
+
+    @Override
+    protected void runAfterCatalogReady() {}
 
 }

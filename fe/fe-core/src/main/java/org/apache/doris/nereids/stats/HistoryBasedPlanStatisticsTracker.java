@@ -38,6 +38,7 @@ import org.apache.doris.statistics.PlanStatistics;
 import org.apache.doris.statistics.PlanStatisticsWithSourceInfo;
 import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
 import org.apache.doris.thrift.TNodeExecStatsItemPB;
+import org.apache.doris.thrift.TPlanNodeRuntimeStatsItem;
 import org.apache.doris.thrift.TQueryStatistics;
 
 import com.google.common.collect.ImmutableList;
@@ -61,6 +62,8 @@ import java.util.function.Supplier;
 
 public class HistoryBasedPlanStatisticsTracker {
     private static final Logger LOG = LogManager.getLogger(HistoryBasedPlanStatisticsTracker.class);
+    public HistoryBasedPlanStatisticsTracker() {}
+/*
     private final HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider;
     private final HistoryBasedStatisticsCacheManager historyBasedStatisticsCacheManager;
     //Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
@@ -69,6 +72,7 @@ public class HistoryBasedPlanStatisticsTracker {
 
     private ConnectContext connectContext;
     private PhysicalPlan root;
+
 
     public HistoryBasedPlanStatisticsTracker(
             ConnectContext connectContext,
@@ -98,23 +102,23 @@ public class HistoryBasedPlanStatisticsTracker {
     }
 
 
-    public void buildPlanNodeToInfoMap(PlanNode root, List<TNodeExecStatsItemPB> pbList,
+    public void buildPlanNodeToInfoMap(PlanNode root, List<TPlanNodeRuntimeStatsItem> itemList,
             Map<PhysicalPlan, PlanNodeCanonicalInfo> infos) {
         for (PlanNode planNode : forTree(PlanNode::getChildren).depthFirstPreOrder(root)) {
             String canonicalPlanString = planNode.toString();
             String hashValue = hashCanonicalPlan(canonicalPlanString);
             ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
             List<PhysicalOlapScan> scans = ((PhysicalPlan) planNode).collectToList(PhysicalOlapScan.class::isInstance);
-            scans.stream().map(scan -> inputTableStatisticsBuilder.add(getPlanStatistics(scan.getId(), pbList)));
+            scans.stream().map(scan -> inputTableStatisticsBuilder.add(getPlanStatistics(scan.getId(), itemList)));
             PlanNodeCanonicalInfo info = new PlanNodeCanonicalInfo(hashValue, inputTableStatisticsBuilder.build());
             infos.putIfAbsent((PhysicalPlan) planNode, info);
         }
     }
 
-    public PlanStatistics getPlanStatistics(int nodeId, List<TNodeExecStatsItemPB> pbList) {
-        for (TNodeExecStatsItemPB item : pbList) {
+    public PlanStatistics getPlanStatistics(int nodeId, List<TPlanNodeRuntimeStatsItem> pbList) {
+        for (TPlanNodeRuntimeStatsItem item : pbList) {
             if (item.node_id == nodeId) {
-                return PlanStatistics.buildFromPB(item);
+                return PlanStatistics.buildFromStatsItem(item);
             }
         }
         return PlanStatistics.EMPTY;
@@ -125,10 +129,10 @@ public class HistoryBasedPlanStatisticsTracker {
         Map<PhysicalPlan, PlanNodeCanonicalInfo> planToInfoMap = new HashMap<>();
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
         if (qs != null && qs.getNodeExecStatsItems() != null && !qs.getNodeExecStatsItems().isEmpty()) {
-            List<TNodeExecStatsItemPB> pbList = qs.getNodeExecStatsItems();
-            for (TNodeExecStatsItemPB nodeStats : pbList) {
+            List<TPlanNodeRuntimeStatsItem> pbList = qs.getNodeExecStatsItems();
+            for (TPlanNodeRuntimeStatsItem nodeStats : pbList) {
                 int nodeId = nodeStats.node_id;
-                PlanStatistics planStatistics = PlanStatistics.buildFromPB(nodeStats);
+                PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
                 PhysicalPlan planNode = idToPlanMap.get(nodeId);
                 if (planNode != null) {
                     buildPlanNodeToInfoMap((PlanNode) planNode, pbList, planToInfoMap);
@@ -240,7 +244,7 @@ public class HistoryBasedPlanStatisticsTracker {
                 //outputSizeSimilarity = outputSizeSimilarity && similarStats(currentInputStatistics.getOutputSize().getValue(), historicalInputStatistics.getOutputSize().getValue(), threshold);
             }
             // Write information if both rows and output size are similar.
-            if (rowSimilarity/* && outputSizeSimilarity*/) {
+            if (rowSimilarity && outputSizeSimilarity) {
                 return Optional.of(lastRunsIndex);
             }
         }
@@ -253,6 +257,6 @@ public class HistoryBasedPlanStatisticsTracker {
             return true;
         }
         return stats1 >= (1 - threshold) * stats2 && stats1 <= (1 + threshold) * stats2;
-    }
+    }*/
 
 }

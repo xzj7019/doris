@@ -48,7 +48,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.google.common.collect.ImmutableMap;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
-import static org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsTracker.getSimilarStatsIndex;
+import static org.apache.doris.common.profile.Profile.getSimilarStatsIndex;
+//import static org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsTracker.getSimilarStatsIndex;
 
 import java.util.List;
 import java.util.Map;
@@ -72,10 +73,14 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         //List<AuditEvent> auditEventList = mgr.getQueryNeedAudit();
         //AuditEvent event = auditEventList.get(0);
         this.queryId = "123";//event.queryId;
-        this.historyBasedPlanStatisticsProvider = requireNonNull(context.getStatementContext().getHistoryBasedPlanStatisticsTracker().getHistoryBasedPlanStatisticsProvider(),
-                "historyBasedPlanStatisticsProvider is null");
-        this.historyBasedStatisticsCacheManager = requireNonNull(context.getStatementContext().getHistoryBasedPlanStatisticsTracker().getHistoryBasedStatisticsCacheManager(),
-                "historyBasedStatisticsCacheManager is null");
+        this.historyBasedPlanStatisticsProvider = requireNonNull(HistoryBasedPlanStatisticsManager.getInstance()
+                        .getHistoryBasedPlanStatisticsProvider(), "historyBasedPlanStatisticsProvider is null");
+        this.historyBasedStatisticsCacheManager = requireNonNull(HistoryBasedPlanStatisticsManager.getInstance()
+                .getHistoryBasedStatisticsCacheManager(), "historyBasedStatisticsCacheManager is null");
+        //this.historyBasedPlanStatisticsProvider = requireNonNull(context.getStatementContext().getHistoryBasedPlanStatisticsTracker().getHistoryBasedPlanStatisticsProvider(),
+        //        "historyBasedPlanStatisticsProvider is null");
+        //this.historyBasedStatisticsCacheManager = requireNonNull(context.getStatementContext().getHistoryBasedPlanStatisticsTracker().getHistoryBasedStatisticsCacheManager(),
+        //        "historyBasedStatisticsCacheManager is null");
     }
 
     @Override
@@ -130,7 +135,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
             if (historicalPlanStatisticsEntry.isPresent()) {
                 PlanStatistics predictedPlanStatistics = historicalPlanStatisticsEntry.get().getPlanStatistics();
                 // todo: choose which one is the output rows count
-                delegateStats.withRowCountAndEnforceValid(predictedPlanStatistics.getPushRows());
+                delegateStats.withRowCountAndEnforceValid(predictedPlanStatistics.getOutputRows());
             }
             return delegateStats;
         }

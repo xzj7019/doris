@@ -48,6 +48,7 @@ import org.apache.doris.nereids.processor.post.PlanPostProcessors;
 import org.apache.doris.nereids.processor.pre.PlanPreprocessors;
 import org.apache.doris.nereids.properties.PhysicalProperties;
 import org.apache.doris.nereids.rules.exploration.mv.MaterializationContext;
+import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.nereids.stats.StatsCalculator;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
@@ -92,6 +93,7 @@ import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -293,12 +295,12 @@ public class NereidsPlanner extends Planner {
         MinidumpUtils.serializeOutputToDumpFile(physicalPlan);
         NereidsTracer.output(statementContext.getConnectContext());
         // hbo related
-        if (statementContext.getConnectContext().getExecutor() != null
-            && statementContext.getConnectContext().getExecutor()
-                .getHistoryBasedPlanStatisticsTracker() != null) {
-            statementContext.getConnectContext().getExecutor()
-                    .getHistoryBasedPlanStatisticsTracker().setContext(cascadesContext, physicalPlan);
-        }
+        //if (statementContext.getConnectContext().getExecutor() != null
+        //    && statementContext.getConnectContext().getExecutor()
+        //        .getHistoryBasedPlanStatisticsTracker() != null) {
+        //    statementContext.getConnectContext().getExecutor()
+        //            .getHistoryBasedPlanStatisticsTracker().setContext(cascadesContext, physicalPlan);
+        //}
         return physicalPlan;
     }
 
@@ -426,7 +428,7 @@ public class NereidsPlanner extends Planner {
             statementContext.getConnectContext().getExecutor().getSummaryProfile().setNereidsOptimizeTime();
         }
     }
-    private void collectExecStatsIds(PhysicalPlan root, PlanFragment fragment,
+    private void collectExecStatsIds(String queryId, PhysicalPlan root, PlanFragment fragment,
             PlanTranslatorContext context) {
         if (ConnectContext.get() == null || cascadesContext == null) {
             return;
@@ -435,14 +437,20 @@ public class NereidsPlanner extends Planner {
             return;
         }
         for (Object child : root.children()) {
-            collectExecStatsIds((PhysicalPlan) child, fragment, context);
+            collectExecStatsIds(queryId, (PhysicalPlan) child, fragment, context);
         }
         if (root.needCollectExecStats() && root instanceof AbstractPlan) {
             int nodeId = ((AbstractPlan) root).getId();
             PlanNodeId planId = context.getNereidsIdToPlanNodeIdMap().get(nodeId);
             if (planId != null) {
                 fragment.getCollectExecStatsIds().add(planId.asInt());
-                cascadesContext.getNeedStatsPlanIdNodeMap().put(planId.asInt(), root);
+                //cascadesContext.getNeedStatsPlanIdNodeMap().put(planId.asInt(), root);
+                Map<Integer, PhysicalPlan> idToPlanMap =
+                HistoryBasedPlanStatisticsManager.getInstance().getHistoryBasedIdToPlanMapProvider().getIdToPlanMap(queryId);
+                if (idToPlanMap.isEmpty()) {
+                    HistoryBasedPlanStatisticsManager.getInstance().getHistoryBasedIdToPlanMapProvider().putIdToPlanMap(queryId, idToPlanMap);
+                }
+                idToPlanMap.put(planId.asInt(), root);
             }
         }
     }
@@ -466,14 +474,15 @@ public class NereidsPlanner extends Planner {
             return;
         }
         PlanFragment root = physicalPlanTranslator.translatePlan(physicalPlan);
-        collectExecStatsIds(physicalPlan, root, planTranslatorContext);
+        String queryId = DebugUtil.printId(cascadesContext.getConnectContext().queryId());
+        collectExecStatsIds(queryId, physicalPlan, root, planTranslatorContext);
+
         scanNodeList.addAll(planTranslatorContext.getScanNodes());
         physicalRelations.addAll(planTranslatorContext.getPhysicalRelations());
         descTable = planTranslatorContext.getDescTable();
         fragments = new ArrayList<>(planTranslatorContext.getPlanFragments());
 
         boolean enableQueryCache = sessionVariable.getEnableQueryCache();
-        String queryId = DebugUtil.printId(cascadesContext.getConnectContext().queryId());
         for (int seq = 0; seq < fragments.size(); seq++) {
             PlanFragment fragment = fragments.get(seq);
             fragment.setFragmentSequenceNum(seq);

@@ -376,12 +376,12 @@ public abstract class ConnectProcessor {
                     auditAfterExec(auditStmt, executor.getParsedStmt(), executor.getQueryStatisticsForAuditLog(),
                             true);
                     LOG.debug("Write audit logs for query {}", DebugUtil.printId(ctx.queryId));
-                    if (executor.getQueryStatisticsForAuditLog() != null && ctx.getSessionVariable().isEnableHboTracker()) {
+                    //if (executor.getQueryStatisticsForAuditLog() != null && ctx.getSessionVariable().isEnableHboTracker()) {
                         // TODO: can't get the realtime current query_id since the audit log channel is asyn and
                         // can't send the stats back to fe in time
                         // change the logic to get all audit query and update the stats
-                        executor.getHistoryBasedPlanStatisticsTracker().updateStatistics(DebugUtil.printId(ctx.queryId));
-                    }
+                    //    executor.getHistoryBasedPlanStatisticsTracker().updateStatistics(DebugUtil.printId(ctx.queryId));
+                    //}
                     // execute failed, skip remaining stmts
                     if (ctx.getState().getStateType() == MysqlStateType.ERR) {
                         break;

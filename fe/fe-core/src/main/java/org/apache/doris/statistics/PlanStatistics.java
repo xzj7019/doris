@@ -16,125 +16,114 @@
 // under the License.
 
 package org.apache.doris.statistics;
+import org.apache.doris.thrift.TPlanNodeRuntimeStatsItem;
 
-import org.apache.doris.thrift.TNodeExecStatsItemPB;
+
 public class PlanStatistics {
-
     private final int nodeId;
+    private final long inputRows;
+    private final long outputRows;
+    private final long commonFilteredRows;
+    private final long runtimeFilteredRows;
+    private final long joinBuilderRows;
+    private final long joinProbeRows;
+    private final int joinBuilderSkewRatio;
+    private final int joinProbeSkewRatio;
+    private final int instanceNum;
 
-    private final long pushRows;
+    public static final PlanStatistics EMPTY = new PlanStatistics(
+            -1, -1, -1, -1, -1,
+            -1, -1, -1, -1, -1);
 
-    private final long pullRows;
-
-    private final long predFilterRows;
-
-    private final long indexFilterRows;
-
-    private final long rfFilterRows;
-
-    public static final PlanStatistics EMPTY = new PlanStatistics(-1, -1, -1, -1, -1, -1);
-
-    public PlanStatistics(int nodeId, long pushRows, long pullRows, long predFilterRows, long indexFilterRows,
-                         long rfFilterRows) {
+    public PlanStatistics(int nodeId, long inputRows, long outputRows,
+                        long commonFilteredRows, long runtimeFilteredRows,
+                        long joinBuilderRows, long joinProbeRows,
+                        int joinBuilderSkewRatio, int joinProbeSkewRatio, int instanceNum) {
         this.nodeId = nodeId;
-        this.pushRows = pushRows;
-        this.pullRows = pullRows;
-        this.predFilterRows = predFilterRows;
-        this.indexFilterRows = indexFilterRows;
-        this.rfFilterRows = rfFilterRows;
+        this.inputRows = inputRows;
+        this.outputRows = outputRows;
+        this.commonFilteredRows = commonFilteredRows;
+        this.runtimeFilteredRows = runtimeFilteredRows;
+        this.joinBuilderRows = joinBuilderRows;
+        this.joinProbeRows = joinProbeRows;
+        this.joinBuilderSkewRatio = joinBuilderSkewRatio;
+        this.joinProbeSkewRatio = joinProbeSkewRatio;
+        this.instanceNum = instanceNum;
     }
 
-    public static PlanStatistics buildFromPB(TNodeExecStatsItemPB itemPB) {
-        return new PlanStatistics(itemPB.getNodeId(), itemPB.getPushRows(), itemPB.getPullRows(), itemPB.getPredFilterRows(),
-                itemPB.getIndexFilterRows(), itemPB.getRfFilterRows());
+    public static PlanStatistics buildFromStatsItem(TPlanNodeRuntimeStatsItem item) {
+        return new PlanStatistics(item.getNodeId(), item.getInputRows(), item.getOutputRows(), item.getCommonFilterRows(),
+                item.getRuntimeFilterRows(), item.getJoinBuilderRows(), item.getJoinProbeRows(),
+                item.getJoinBuilderSkewRatio(), item.getJoinProberSkewRatio(), item.getInstanceNum());
     }
 
     public int getNodeId() {
         return nodeId;
     }
 
-    public long getPushRows() {
-        return pushRows;
-    }
+    public long getInputRows() { return inputRows; }
 
-    public long getPullRows() {
-        return pullRows;
-    }
+    public long getOutputRows() { return outputRows; }
 
-    public long getPredFilterRows() {
-        return predFilterRows;
-    }
+    public long getCommonFilteredRows() { return commonFilteredRows; }
 
-    public long getIndexFilterRows() {
-        return indexFilterRows;
-    }
+    public long getRuntimeFilteredRows() { return runtimeFilteredRows; }
 
-    public long getRfFilterRows() {
-        return rfFilterRows;
-    }
+    public long getJoinBuilderRows() { return joinBuilderRows; }
+
+    public long getJoinProbeRows() { return joinProbeRows; }
+
+    public int getJoinBuilderSkewRatio() { return joinBuilderSkewRatio; }
+
+    public int getJoinProbeSkewRatio() { return joinProbeSkewRatio; }
+
+    public int getInstanceNum() { return instanceNum; }
 
     public static final class Builder {
         private int nodeId;
-
-        private long pushRows;
-
-        private long pullRows;
-
-        private long predFilterRows;
-
-        private long indexFilterRows;
-
-        private long rfFilterRows;
+        private long inputRows;
+        private long outputRows;
+        private long commonFilteredRows;
+        private long runtimeFilteredRows;
+        private long joinBuilderRows;
+        private long joinProbeRows;
+        private int joinBuilderSkewRatio;
+        private int joinProbeSkewRatio;
+        private int instanceNum;
 
         public Builder() {
 
         }
 
-        public Builder(int nodeId, long pushRows, long pullRows, long predFilterRows, long indexFilterRows, long rfFilterRows) {
+        public Builder(int nodeId, long inputRows, long outputRows,
+                long commonFilteredRows, long runtimeFilteredRows,
+                long joinBuilderRows, long joinProbeRows,
+                int joinBuilderSkewRatio, int joinProbeSkewRatio, int instanceNum) {
             this.nodeId = nodeId;
-            this.pushRows = pushRows;
-            this.pullRows = pullRows;
-            this.predFilterRows = predFilterRows;
-            this.indexFilterRows = indexFilterRows;
-            this.rfFilterRows = rfFilterRows;
+            this.inputRows = inputRows;
+            this.outputRows = outputRows;
+            this.commonFilteredRows = commonFilteredRows;
+            this.runtimeFilteredRows = runtimeFilteredRows;
+            this.joinBuilderRows = joinBuilderRows;
+            this.joinProbeRows = joinProbeRows;
+            this.joinBuilderSkewRatio = joinBuilderSkewRatio;
+            this.joinProbeSkewRatio = joinProbeSkewRatio;
+            this.instanceNum = instanceNum;
         }
 
         public PlanStatistics build() {
-            return new PlanStatistics(nodeId, pushRows, pullRows, predFilterRows, indexFilterRows, rfFilterRows);
+            return new PlanStatistics(nodeId, inputRows, outputRows, commonFilteredRows, runtimeFilteredRows,
+                    joinBuilderRows, joinProbeRows, joinBuilderSkewRatio, joinProbeSkewRatio, instanceNum);
         }
 
         public static Builder buildFrom(PlanStatistics execStats) {
-            return new Builder(execStats.getNodeId(), execStats.getPullRows(), execStats.getPullRows(),
-                    execStats.getPredFilterRows(), execStats.getIndexFilterRows(), execStats.getRfFilterRows());
+            return new Builder(execStats.getNodeId(), execStats.getInputRows(), execStats.getOutputRows(), execStats.getCommonFilteredRows(),
+                    execStats.getRuntimeFilteredRows(), execStats.getJoinBuilderRows(), execStats.getJoinProbeRows(),
+                    execStats.getJoinBuilderSkewRatio(), execStats.getJoinProbeSkewRatio(), execStats.getInstanceNum());
         }
 
         public Builder setNodeId(int nodeId) {
             this.nodeId = nodeId;
-            return this;
-        }
-
-        public Builder setPushRows(long pushRows) {
-            this.pushRows = pushRows;
-            return this;
-        }
-
-        public Builder setPullRows(long pullRows) {
-            this.pullRows = pullRows;
-            return this;
-        }
-
-        public Builder setPredFilterRows(long predFilterRows) {
-            this.predFilterRows = predFilterRows;
-            return this;
-        }
-
-        public Builder setIndexFilterRows(long indexFilterRows) {
-            this.indexFilterRows = indexFilterRows;
-            return this;
-        }
-
-        public Builder setRfFilterRows(long rfFilterRows) {
-            this.rfFilterRows = rfFilterRows;
             return this;
         }
     }

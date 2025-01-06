@@ -1724,8 +1724,8 @@ struct TPlanNodeRuntimeStatsItem {
     5: optional i64 runtime_filter_rows
     6: optional i64 join_builder_rows
     7: optional i64 join_probe_rows
-    8: optional double join_builder_skew_ratio
-    9: optional double join_prober_skew_ratio
+    8: optional i32 join_builder_skew_ratio
+    9: optional i32 join_prober_skew_ratio
     10: optional i32 instance_num
 }
 

@@ -314,11 +314,11 @@ public class StmtExecutor {
                 this.context.getSessionVariable().enableProfile(),
                 this.context.getSessionVariable().getProfileLevel(),
                 this.context.getSessionVariable().getAutoProfileThresholdMs());
-        this.historyBasedPlanStatisticsTracker = new HistoryBasedPlanStatisticsTracker(
-                context,
-                new InMemoryHistoryBasedPlanStatisticsProvider(),
-                new HistoryBasedStatisticsCacheManager());
-        this.statementContext.setHistoryBasedPlanStatisticsTracker(historyBasedPlanStatisticsTracker);
+        //this.historyBasedPlanStatisticsTracker = new HistoryBasedPlanStatisticsTracker(
+        //        context,
+        //        new InMemoryHistoryBasedPlanStatisticsProvider(),
+        //        new HistoryBasedStatisticsCacheManager());
+        //this.statementContext.setHistoryBasedPlanStatisticsTracker(historyBasedPlanStatisticsTracker);
     }
 
     // for test
@@ -352,10 +352,10 @@ public class StmtExecutor {
                             context.getSessionVariable().enableProfile(),
                             context.getSessionVariable().getProfileLevel(),
                             context.getSessionVariable().getAutoProfileThresholdMs());
-        this.historyBasedPlanStatisticsTracker = new HistoryBasedPlanStatisticsTracker(
-                context, new InMemoryHistoryBasedPlanStatisticsProvider(),
-                new HistoryBasedStatisticsCacheManager());
-        this.statementContext.setHistoryBasedPlanStatisticsTracker(historyBasedPlanStatisticsTracker);
+        //this.historyBasedPlanStatisticsTracker = new HistoryBasedPlanStatisticsTracker(
+        //        context, new InMemoryHistoryBasedPlanStatisticsProvider(),
+        //        new HistoryBasedStatisticsCacheManager());
+        //this.statementContext.setHistoryBasedPlanStatisticsTracker(historyBasedPlanStatisticsTracker);
     }
 
     public HistoryBasedPlanStatisticsTracker getHistoryBasedPlanStatisticsTracker() {

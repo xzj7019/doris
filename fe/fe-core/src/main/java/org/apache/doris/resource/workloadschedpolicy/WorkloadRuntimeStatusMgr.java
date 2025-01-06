@@ -228,7 +228,7 @@ public class WorkloadRuntimeStatusMgr extends MasterDaemon {
         if (dst.max_peak_memory_bytes < src.max_peak_memory_bytes) {
             dst.max_peak_memory_bytes = src.max_peak_memory_bytes;
         }
-        List<TNodeExecStatsItemPB> dst_list = dst.getNodeExecStatsItems();
+        /*List<TNodeExecStatsItemPB> dst_list = dst.getNodeExecStatsItems();
         if (src.node_exec_stats_items != null && !src.node_exec_stats_items.isEmpty()) {
             for (TNodeExecStatsItemPB pb : src.node_exec_stats_items) {
                 TNodeExecStatsItemPB targetPb = null;
@@ -248,7 +248,7 @@ public class WorkloadRuntimeStatusMgr extends MasterDaemon {
                     dst_list.add(newPb);
                 }
             }
-        }
+        }*/
     }
 
     private void queryAuditEventLogWriteLock() {
