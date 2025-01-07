@@ -19,21 +19,29 @@ package org.apache.doris.nereids.stats;
 
 import org.apache.doris.catalog.Env;
 import org.apache.doris.nereids.CascadesContext;
+import org.apache.doris.nereids.glue.translator.PlanTranslatorContext;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.trees.expressions.CTEId;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
+import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.algebra.Aggregate;
 import org.apache.doris.nereids.trees.plans.algebra.Filter;
 import org.apache.doris.nereids.trees.plans.algebra.Join;
 import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalJoin;
+import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalJoin;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
+import org.apache.doris.planner.PlanFragment;
 import org.apache.doris.planner.PlanNode;
+import org.apache.doris.planner.PlanNodeId;
 import org.apache.doris.planner.PlanNodeWithHash;
 import org.apache.doris.plugin.AuditEvent;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.resource.workloadschedpolicy.WorkloadRuntimeStatusMgr;
 import org.apache.doris.statistics.ColumnStatistic;
 import org.apache.doris.statistics.HistoricalPlanStatistics;
@@ -44,6 +52,7 @@ import org.apache.doris.statistics.PlanStatistics;
 import org.apache.doris.statistics.Statistics;
 import org.apache.doris.statistics.StatisticsBuilder;
 
+import com.google.common.collect.ImmutableList;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import com.google.common.collect.ImmutableMap;
 import static java.lang.String.format;
@@ -51,6 +60,11 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.doris.common.profile.Profile.getSimilarStatsIndex;
 //import static org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsTracker.getSimilarStatsIndex;
 
+import static com.google.common.hash.Hashing.sha256;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -88,11 +102,11 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         super.estimate();
     }
 
-    @Override
-    protected Statistics computeFilter(Filter filter) {
-        Statistics childStats = groupExpression.childStatistics(0);
-        return getHistoricalStatistics((AbstractPlan) filter, childStats);
-    }
+    //@Override
+    //protected Statistics computeFilter(Filter filter) {
+    //    Statistics childStats = groupExpression.childStatistics(0);
+    //    return getHistoricalStatistics((AbstractPlan) filter, childStats);
+    //}
 
     @Override
     protected Statistics computeJoin(Join join) {
@@ -102,48 +116,82 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         return getHistoricalStatistics((AbstractPlan) join, legacyStats);
     }
 
-    @Override
-    protected Statistics computeAggregate(Aggregate<? extends Plan> aggregate) {
-        Statistics childStats = groupExpression.childStatistics(0);
-        return getHistoricalStatistics((AbstractPlan) aggregate, childStats);
+    //@Override
+    //protected Statistics computeAggregate(Aggregate<? extends Plan> aggregate) {
+    //    Statistics childStats = groupExpression.childStatistics(0);
+    //    return getHistoricalStatistics((AbstractPlan) aggregate, childStats);
+    //}
+
+    private String hashCanonicalPlan(String planString)
+    {
+        return sha256().hashString(planString, UTF_8).toString();
     }
 
     private Statistics getHistoricalStatistics(AbstractPlan planNode, Statistics delegateStats)
     {
-        boolean isEnableHbo = false;
-        if (!isEnableHbo) {
-            return delegateStats;
+        String hash;
+        if (planNode instanceof AbstractPhysicalPlan) {
+            hash = planNode.hboTreeString();
+            hash = hashCanonicalPlan(hash);
+        } else if (planNode instanceof AbstractLogicalPlan) {
+            hash = planNode.hboTreeString();
+            hash = hashCanonicalPlan(hash);
         } else {
-            String hash;
-            if (planNode instanceof AbstractPhysicalPlan) {
-                hash = planNode.hboTreeString();
-            } else if (planNode instanceof AbstractLogicalPlan) {
-                hash = planNode.hboTreeString();
-            } else {
-                throw new IllegalStateException("hbo get neither physical plan nor logical plan");
-            }
-            PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash(null, Optional.of(hash));
-            HistoricalPlanStatistics planStatistics = historyBasedStatisticsCacheManager
-                    .getStatisticsCache(queryId, historyBasedPlanStatisticsProvider, 1000)
-                    .getUnchecked(planNodeWithHash);
+            throw new IllegalStateException("hbo get neither physical plan nor logical plan");
+        }
+        PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash(planNode, Optional.of(hash));
+        HistoricalPlanStatistics planStatistics = historyBasedStatisticsCacheManager
+                .getStatisticsCache(queryId, historyBasedPlanStatisticsProvider, 1000)
+                .getUnchecked(planNodeWithHash);
 
-            Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(planNode, true);
-            // TODO: get current inputTableStatistics
+        Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(planNode, true);
+        // TODO: get current inputTableStatistics
+        if (inputTableStatistics.isPresent()) {
             Optional<HistoricalPlanStatisticsEntry> historicalPlanStatisticsEntry
                     = getSelectedHistoricalPlanStatisticsEntry
                     (planStatistics, inputTableStatistics.get(), 0.1);
             if (historicalPlanStatisticsEntry.isPresent()) {
                 PlanStatistics predictedPlanStatistics = historicalPlanStatisticsEntry.get().getPlanStatistics();
                 // todo: choose which one is the output rows count
-                delegateStats.withRowCountAndEnforceValid(predictedPlanStatistics.getOutputRows());
+                delegateStats = delegateStats.withRowCountAndEnforceValid(predictedPlanStatistics.getOutputRows());
             }
-            return delegateStats;
+        }
+        return delegateStats;
+    }
+
+    public static void collectScans(AbstractPlan planNode, List<LogicalOlapScan> scanList) {
+        if (planNode instanceof LogicalOlapScan) {
+            scanList.add((LogicalOlapScan) planNode);
+        } else if (planNode instanceof GroupPlan && ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan() instanceof LogicalPlan) {
+            Plan logicalPlan = ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan();
+            collectScans((AbstractPlan) logicalPlan, scanList);
+        } else {
+            for (Object child : planNode.children()) {
+                collectScans((AbstractPlan) child, scanList);
+            }
         }
     }
 
-    private Optional<List<PlanStatistics>> getPlanNodeInputTableStatistics(AbstractPlan plan, boolean cacheOnly)
+    private Optional<List<PlanStatistics>> getPlanNodeInputTableStatistics(AbstractPlan planNode, boolean cacheOnly)
     {
-        return Optional.empty(); //getInputTableStatistics(plan, cacheOnly);
+        ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
+        //List<LogicalOlapScan> scans = planNode.collectToList(LogicalOlapScan.class::isInstance);
+        List<LogicalOlapScan> scans = new ArrayList<>();
+        collectScans(planNode, scans);
+        for (LogicalOlapScan scan : scans) {
+            String hash = scan.hboTreeString();
+            hash = hashCanonicalPlan(hash);
+            PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash(scan, Optional.of(hash));
+            HistoricalPlanStatistics historicalPlanStatistics = historyBasedPlanStatisticsProvider.getStats(planNodeWithHash);
+            if (historicalPlanStatistics.equals(historicalPlanStatistics.empty())) {
+                return Optional.empty();
+            } else {
+                PlanStatistics planStatistics = historicalPlanStatistics.getLastRunsStatistics().get(0).getPlanStatistics();
+                inputTableStatisticsBuilder.add(planStatistics);
+            }
+        }
+
+        return Optional.of(inputTableStatisticsBuilder.build());
     }
 
     public static Optional<HistoricalPlanStatisticsEntry> getSelectedHistoricalPlanStatisticsEntry(

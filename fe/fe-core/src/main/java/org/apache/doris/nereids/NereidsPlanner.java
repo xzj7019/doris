@@ -447,10 +447,14 @@ public class NereidsPlanner extends Planner {
                 //cascadesContext.getNeedStatsPlanIdNodeMap().put(planId.asInt(), root);
                 Map<Integer, PhysicalPlan> idToPlanMap =
                 HistoryBasedPlanStatisticsManager.getInstance().getHistoryBasedIdToPlanMapProvider().getIdToPlanMap(queryId);
+                Map<PhysicalPlan, Integer> planToIdMap =
+                        HistoryBasedPlanStatisticsManager.getInstance().getHistoryBasedIdToPlanMapProvider().getPlanToIdMap(queryId);
                 if (idToPlanMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance().getHistoryBasedIdToPlanMapProvider().putIdToPlanMap(queryId, idToPlanMap);
+                    HistoryBasedPlanStatisticsManager.getInstance().getHistoryBasedIdToPlanMapProvider().putPlanToIdMap(queryId, planToIdMap);
                 }
                 idToPlanMap.put(planId.asInt(), root);
+                planToIdMap.put(root, planId.asInt());
             }
         }
     }

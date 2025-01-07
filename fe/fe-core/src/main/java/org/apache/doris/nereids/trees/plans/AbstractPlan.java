@@ -28,6 +28,7 @@ import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.StatementScopeIdGenerator;
 import org.apache.doris.nereids.trees.plans.TreeStringPlan.TreeStringNode;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.nereids.util.MutableState;
 import org.apache.doris.nereids.util.TreeStringUtils;
 import org.apache.doris.statistics.Statistics;
@@ -114,7 +115,7 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
     }
 
     public String toHboString() {
-        return "NOT implemented";
+        return "";
     }
 
     public String hboTreeString() {
@@ -124,7 +125,16 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
             return builder.toString();
         } else {
             for (Plan plan : children) {
-                builder.append(plan.toString());
+                if (plan instanceof GroupPlan && ((GroupPlan) plan).getGroup().getLogicalExpressions().get(0).getPlan() instanceof LogicalPlan) {
+                    LogicalPlan logicalPlan = (LogicalPlan) ((GroupPlan) plan).getGroup().getLogicalExpressions().get(0).getPlan();
+                    builder.append(((AbstractPlan) logicalPlan).hboTreeString());
+                } else if (plan instanceof LogicalPlan) {
+                    builder.append(((AbstractPlan) plan).hboTreeString());
+                } else if (plan instanceof AbstractPhysicalPlan) {
+                    builder.append(((AbstractPlan) plan).hboTreeString());
+                } else {
+                    throw new RuntimeException("hboTreeString illegal plan type");
+                }
             }
             return builder.toString();
         }

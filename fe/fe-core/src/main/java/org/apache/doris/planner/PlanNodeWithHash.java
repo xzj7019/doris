@@ -20,6 +20,9 @@
 
 package org.apache.doris.planner;
 
+import org.apache.doris.nereids.trees.plans.AbstractPlan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
+
 import java.util.Objects;
 import java.util.Optional;
 
@@ -28,17 +31,17 @@ import static java.util.Objects.requireNonNull;
 
 public class PlanNodeWithHash
 {
-    private final PlanNode planNode;
+    private final AbstractPlan planNode;
     // An optional canonical hash of the corresponding plan node. Hash strategy is part of `CanonicalPlan` which gets hashed, hence different strategies gives different hash
     private final Optional<String> hash;
 
-    public PlanNodeWithHash(PlanNode planNode, Optional<String> hash)
+    public PlanNodeWithHash(AbstractPlan planNode, Optional<String> hash)
     {
         this.planNode = requireNonNull(planNode, "planNode is null");
         this.hash = requireNonNull(hash, "hash is null");
     }
 
-    public PlanNode getPlanNode()
+    public AbstractPlan getPlanNode()
     {
         return planNode;
     }

@@ -25,9 +25,14 @@ import org.apache.doris.nereids.NereidsPlanner;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.nereids.stats.HistoryBasedStatisticsCacheManager;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
+import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.distribute.DistributedPlan;
 import org.apache.doris.nereids.trees.plans.distribute.FragmentIdMapping;
+import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
+import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalJoin;
+import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalRelation;
@@ -54,6 +59,8 @@ import com.google.common.collect.ImmutableMap;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.graph.SuccessorsFunction;
+import com.google.common.graph.Traverser;
 import static com.google.common.graph.Traverser.forTree;
 import static com.google.common.hash.Hashing.sha256;
 import com.google.gson.Gson;
@@ -78,6 +85,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
@@ -408,21 +416,47 @@ public class Profile {
         return PlanStatistics.EMPTY;
     }
 
-    public void buildPlanNodeToInfoMap(PlanNode root, List<TPlanNodeRuntimeStatsItem> runtimeStatsItem,
+    public static void collectScans(AbstractPlan planNode, List<LogicalOlapScan> scanList) {
+        if (planNode instanceof LogicalOlapScan) {
+            scanList.add((LogicalOlapScan) planNode);
+        } else if (planNode instanceof GroupPlan
+                && ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan() instanceof LogicalPlan) {
+            Plan logicalPlan = ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan();
+            collectScans((AbstractPlan) logicalPlan, scanList);
+        } else {
+            for (Object child : planNode.children()) {
+                collectScans((AbstractPlan) child, scanList);
+            }
+        }
+    }
+
+    public void buildPlanNodeToInfoMap(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
+            List<TPlanNodeRuntimeStatsItem> runtimeStatsItem,
             Map<PhysicalPlan, PlanNodeCanonicalInfo> infos) {
-        for (PlanNode planNode : forTree(PlanNode::getChildren).depthFirstPreOrder(root)) {
-            String canonicalPlanString = planNode.toString();
-            String hashValue = hashCanonicalPlan(canonicalPlanString);
-            ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
-            List<PhysicalOlapScan> scans = ((PhysicalPlan) planNode).collectToList(PhysicalOlapScan.class::isInstance);
-            scans.stream().map(scan -> inputTableStatisticsBuilder.add(getPlanStatistics(scan.getId(), runtimeStatsItem)));
-            PlanNodeCanonicalInfo info = new PlanNodeCanonicalInfo(hashValue, inputTableStatisticsBuilder.build());
-            infos.putIfAbsent((PhysicalPlan) planNode, info);
+        //List<Plan> children = root.children().stream().collect(Collectors.toList());
+        Traverser<Plan> traverser = Traverser.forTree(Plan::children);
+        for (Plan planNode : traverser.depthFirstPreOrder(root)) {
+            if (planNode instanceof PhysicalOlapScan
+                || planNode instanceof AbstractPhysicalJoin) {
+                String canonicalPlanString = ((AbstractPhysicalPlan) planNode).hboTreeString();
+                String hashValue = hashCanonicalPlan(canonicalPlanString);
+                ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
+                List<PhysicalOlapScan> scans = planNode.collectToList(PhysicalOlapScan.class::isInstance);
+                for (PhysicalOlapScan scan : scans) {
+                    int nodeId = planToIdMap.get(scan);
+                    PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem);
+                    if (!planStatistics.equals(PlanStatistics.EMPTY)) {
+                        inputTableStatisticsBuilder.add(planStatistics);
+                    }
+                }
+                PlanNodeCanonicalInfo info = new PlanNodeCanonicalInfo(hashValue, inputTableStatisticsBuilder.build());
+                infos.putIfAbsent((PhysicalPlan) planNode, info);
+            }
         }
     }
 
     public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> getQueryStats(String queryId, // queryId is useless
-            Map<Integer, PhysicalPlan> idToPlanMap,
+            Map<Integer, PhysicalPlan> idToPlanMap, Map<PhysicalPlan, Integer> planToIdMap,
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
         Map<PhysicalPlan, PlanNodeCanonicalInfo> planToInfoMap = new HashMap<>();
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
@@ -432,12 +466,12 @@ public class Profile {
             PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
             PhysicalPlan planNode = idToPlanMap.get(nodeId);
             if (planNode != null) {
-                buildPlanNodeToInfoMap((PlanNode) planNode, planNodeRuntimeStatsItems, planToInfoMap);
+                buildPlanNodeToInfoMap(planNode, planToIdMap, planNodeRuntimeStatsItems, planToInfoMap);
                 Optional<PlanNodeCanonicalInfo> planNodeCanonicalInfo = Optional.ofNullable(
                         planToInfoMap.get(planNode));
                 if (planNodeCanonicalInfo.isPresent()) {
                     String hash = planNodeCanonicalInfo.get().getHash();
-                    PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash((PlanNode) planNode,
+                    PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash((AbstractPlan) planNode,
                             Optional.of(hash));
                     List<PlanStatistics> inputTableStatistics = planNodeCanonicalInfo.get()
                             .getInputTableStatistics();
@@ -462,34 +496,39 @@ public class Profile {
         // get idToPlanMap
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
         Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
-        // get plan statistics
-        Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(queryId, idToPlanMap, planNodeRuntimeStatsItems);
-        Map<PlanNodeWithHash, HistoricalPlanStatistics> historicalPlanStatisticsMap =
-                historyBasedPlanStatisticsProvider.getStats(
-                        planStatistics.keySet().stream().collect(toImmutableList()), 1000);
+        Map<PhysicalPlan, Integer> planToIdMap = idToMapProvider.getPlanToIdMap(queryId);
+        // find the idToPlan entry
+        if (!idToPlanMap.isEmpty()) {
+            // get plan statistics
+            Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(queryId, idToPlanMap,
+                    planToIdMap, planNodeRuntimeStatsItems);
+            Map<PlanNodeWithHash, HistoricalPlanStatistics> historicalPlanStatisticsMap =
+                    historyBasedPlanStatisticsProvider.getStats(
+                            planStatistics.keySet().stream().collect(toImmutableList()), 1000);
 
-        // update plan statistics
-        Map<PlanNodeWithHash, HistoricalPlanStatistics> newPlanStatistics = planStatistics.entrySet().stream()
-                .filter(entry -> entry.getKey().getHash().isPresent() &&
-                        entry.getValue().getSourceInfo().getInputTableStatistics().isPresent())
-                .collect(toImmutableMap(
-                        Map.Entry::getKey,
-                        entry -> {
-                            HistoricalPlanStatistics oldPlanStatistics = Optional.ofNullable(
-                                            historicalPlanStatisticsMap.get(entry.getKey()))
-                                    .orElseGet(HistoricalPlanStatistics::empty);
-                            HistoryBasedSourceInfo historyBasedSourceInfo = entry.getValue().getSourceInfo();
-                            return updatePlanStatistics(
-                                    oldPlanStatistics,
-                                    historyBasedSourceInfo.getInputTableStatistics().get(),
-                                    entry.getValue().getPlanStatistics());
-                        }));
+            // update plan statistics
+            Map<PlanNodeWithHash, HistoricalPlanStatistics> newPlanStatistics = planStatistics.entrySet().stream()
+                    .filter(entry -> entry.getKey().getHash().isPresent() &&
+                            entry.getValue().getSourceInfo().getInputTableStatistics().isPresent())
+                    .collect(toImmutableMap(
+                            Map.Entry::getKey,
+                            entry -> {
+                                HistoricalPlanStatistics oldPlanStatistics = Optional.ofNullable(
+                                                historicalPlanStatisticsMap.get(entry.getKey()))
+                                        .orElseGet(HistoricalPlanStatistics::empty);
+                                HistoryBasedSourceInfo historyBasedSourceInfo = entry.getValue().getSourceInfo();
+                                return updatePlanStatistics(
+                                        oldPlanStatistics,
+                                        historyBasedSourceInfo.getInputTableStatistics().get(),
+                                        entry.getValue().getPlanStatistics());
+                            }));
 
-        // publish stats and refresh cache
-        if (!newPlanStatistics.isEmpty()) {
-            historyBasedPlanStatisticsProvider.putStats(ImmutableMap.copyOf(newPlanStatistics));
+            // publish stats and refresh cache
+            if (!newPlanStatistics.isEmpty()) {
+                historyBasedPlanStatisticsProvider.putStats(ImmutableMap.copyOf(newPlanStatistics));
+            }
+            historyBasedStatisticsCacheManager.invalidate(queryId);
         }
-        historyBasedStatisticsCacheManager.invalidate(queryId);
     }
 
     public static HistoricalPlanStatistics updatePlanStatistics(
@@ -607,7 +646,7 @@ public class Profile {
                 planNodeRuntimeStatsItems = RuntimeProfile.toTPlanNodeRuntimeStatsItem(mergedProfile, null);
                 planNodeRuntimeStatsItems = RuntimeProfile.mergeTPlanNodeRuntimeStatsItem(planNodeRuntimeStatsItems);
                 // publish to hbo manager
-                String queryId = this.executionProfiles.get(0).getQueryId().toString();
+                String queryId = DebugUtil.printId(this.executionProfiles.get(0).getQueryId());
                 publishHistoricalStatistics(queryId, planNodeRuntimeStatsItems);
                 // for debug
                 builder.append("\nHBOStatics \n");

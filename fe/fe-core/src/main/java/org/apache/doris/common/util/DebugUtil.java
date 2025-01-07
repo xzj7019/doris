@@ -251,7 +251,7 @@ public class DebugUtil {
             "JoinBuilderRows", "JoinProbeRows", "JoinBuilderSkewRatio", "JoinProbeSkewRatio"));
 
         for (TPlanNodeRuntimeStatsItem item : planNodeRuntimeStatsItems) {
-            result.append(String.format("%-10d %-10d %-15d %-15d %-15d %-15d %-15d %-15d %-15.2f %-15.2f\n", 
+            result.append(String.format("%-10d %-10d %-15d %-15d %-15d %-15d %-15d %-15d %-15d %-15d\n",
                 item.getNodeId(),
                 item.getInstanceNum(),
                 item.getInputRows(),

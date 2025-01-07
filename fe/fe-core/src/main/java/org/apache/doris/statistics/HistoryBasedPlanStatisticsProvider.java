@@ -33,6 +33,8 @@ public interface HistoryBasedPlanStatisticsProvider
      */
     Map<PlanNodeWithHash, HistoricalPlanStatistics> getStats(List<PlanNodeWithHash> nodeIds, long timeoutInMilliSeconds);
 
+    HistoricalPlanStatistics getStats(PlanNodeWithHash planNodeWithHash);
+
     /**
      * Given plan hashes and corresponding statistics after a query is run, store them for future retrieval.
      */

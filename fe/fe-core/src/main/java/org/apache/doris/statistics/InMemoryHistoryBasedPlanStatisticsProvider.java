@@ -36,6 +36,14 @@ public class InMemoryHistoryBasedPlanStatisticsProvider
     }
 
     @Override
+    public HistoricalPlanStatistics getStats(PlanNodeWithHash planNodeWithHash) {
+        if (planNodeWithHash.getHash().isPresent()) {
+            return cache.getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
+        }
+        return HistoricalPlanStatistics.empty();
+    }
+
+    @Override
     public Map<PlanNodeWithHash, HistoricalPlanStatistics> getStats(List<PlanNodeWithHash> planNodeHashes,
             long timeoutInMilliSeconds) {
         return planNodeHashes.stream().collect(toImmutableMap(
