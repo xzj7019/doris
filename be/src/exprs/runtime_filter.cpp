@@ -26,6 +26,7 @@
 #include <algorithm>
 // IWYU pragma: no_include <bits/chrono.h>
 #include <chrono> // IWYU pragma: keep
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -1248,6 +1249,7 @@ Status IRuntimeFilter::push_to_remote(RuntimeState* state, const TNetworkAddress
 
 Status IRuntimeFilter::get_push_expr_ctxs(std::list<vectorized::VExprContextSPtr>& probe_ctxs,
                                           std::vector<vectorized::VRuntimeFilterPtr>& push_exprs,
+                                          ExprRuntimeFilterInfo& expr_rf_info,
                                           bool is_late_arrival) {
     DCHECK(is_consumer());
     auto origin_size = push_exprs.size();
@@ -1264,6 +1266,11 @@ Status IRuntimeFilter::get_push_expr_ctxs(std::list<vectorized::VExprContextSPtr
         push_exprs[i]->attach_profile_counter(expr_filtered_rows_counter, expr_input_rows_counter,
                                               always_true_counter);
     }
+    // The runtime filter is pushed down, adding filtering information.
+    // expr_rf_info record the runtime filter use as a expr.
+    expr_rf_info.always_true_counter = always_true_counter;
+    expr_rf_info.expr_filtered_rows_counter = expr_filtered_rows_counter;
+    expr_rf_info.expr_input_rows_counter = expr_input_rows_counter;
     return Status::OK();
 }
 

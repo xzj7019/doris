@@ -70,6 +70,10 @@ protected:
     phmap::flat_hash_set<vectorized::VExprSPtr> _rf_vexpr_set;
     RuntimeState* _state = nullptr;
 
+    // mapping from filter id to filter info
+    // there are two types of filter info, since runtime filter can be executed as predicate or expression.
+    std::map<int, ExprRuntimeFilterInfo> _expr_rf_info;
+
 private:
     int32_t _filter_id;
 
