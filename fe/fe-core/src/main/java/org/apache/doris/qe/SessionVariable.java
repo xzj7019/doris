@@ -331,6 +331,7 @@ public class SessionVariable implements Serializable, Writable {
     public static final String ENABLE_HBO_OPTIMIZATION = "enable_hbo_optimization";
 
     public static final String ENABLE_HBO_TRACKER = "enable_hbo_tracker";
+    public static final String HBO_RFSAFE_THRESHOLD = "hbo_rfsafe_threshold";
     public static final String NTH_OPTIMIZED_PLAN = "nth_optimized_plan";
 
     public static final String ENABLE_NEREIDS_PLANNER = "enable_nereids_planner";
@@ -1433,6 +1434,10 @@ public class SessionVariable implements Serializable, Writable {
         return enableHboOptimization;
     }
 
+    public double getHboRfSafeThreshold() {
+        return hboRfSafeThreshold;
+    }
+
     @VariableMgr.VarAttr(name = ENABLE_HBO_OPTIMIZATION)
     private boolean enableHboOptimization = false;
 
@@ -1442,6 +1447,9 @@ public class SessionVariable implements Serializable, Writable {
 
     @VariableMgr.VarAttr(name = ENABLE_HBO_TRACKER)
     private boolean enableHboTracker = false;
+
+    @VariableMgr.VarAttr(name = "HBO_RFSAFE_THRESHOLD", needForward = true)
+    public double hboRfSafeThreshold = 0.5;
 
 
     /**

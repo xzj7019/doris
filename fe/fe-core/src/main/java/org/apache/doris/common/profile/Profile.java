@@ -464,8 +464,11 @@ public class Profile {
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
             int nodeId = nodeStats.node_id;
             PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
+            // check plan statistics validity
+            boolean isRFSafeNode = planStatistics.isRuntimeFilterSafeNode();
             PhysicalPlan planNode = idToPlanMap.get(nodeId);
-            if (planNode != null) {
+            // non-rfsafe node's plan stats info will NOT be collected and used in hbo stats calculating
+            if (planNode != null && isRFSafeNode) {
                 buildPlanNodeToInfoMap(planNode, planToIdMap, planNodeRuntimeStatsItems, planToInfoMap);
                 Optional<PlanNodeCanonicalInfo> planNodeCanonicalInfo = Optional.ofNullable(
                         planToInfoMap.get(planNode));

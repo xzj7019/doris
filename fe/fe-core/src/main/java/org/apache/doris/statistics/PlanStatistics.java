@@ -16,6 +16,7 @@
 // under the License.
 
 package org.apache.doris.statistics;
+import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.thrift.TPlanNodeRuntimeStatsItem;
 
 
@@ -87,6 +88,24 @@ public class PlanStatistics {
     public int getJoinProbeSkewRatio() { return joinProbeSkewRatio; }
 
     public int getInstanceNum() { return instanceNum; }
+
+    public boolean isRuntimeFilterSafeNode() {
+        ConnectContext ctx = ConnectContext.get();
+        if (runtimeFilteredRows == 0 && runtimeFilterInputRows == 0) {
+            return true;
+        } else if (runtimeFilteredRows > 0 && runtimeFilterInputRows > 0
+                && runtimeFilterInputRows >= runtimeFilteredRows) {
+            if (ctx != null && ctx.getSessionVariable() != null) {
+                double rfSafeThreshold = ctx.getSessionVariable().getHboRfSafeThreshold();
+                double rfFilterRatio = (double) (runtimeFilteredRows / runtimeFilterInputRows);
+                return rfFilterRatio > rfSafeThreshold;
+            } else {
+                return false;
+            }
+        } else {
+            throw new RuntimeException("Illegal runtime stats found");
+        }
+    }
 
     public static final class Builder {
         private int nodeId;
