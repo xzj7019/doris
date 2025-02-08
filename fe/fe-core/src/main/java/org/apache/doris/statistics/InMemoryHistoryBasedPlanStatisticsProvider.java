@@ -36,16 +36,15 @@ public class InMemoryHistoryBasedPlanStatisticsProvider
     }
 
     @Override
-    public HistoricalPlanStatistics getStats(PlanNodeWithHash planNodeWithHash) {
+    public HistoricalPlanStatistics getHboStats(PlanNodeWithHash planNodeWithHash) {
         if (planNodeWithHash.getHash().isPresent()) {
-            return cache.getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
+             return cache.getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
         }
         return HistoricalPlanStatistics.empty();
     }
 
     @Override
-    public Map<PlanNodeWithHash, HistoricalPlanStatistics> getStats(List<PlanNodeWithHash> planNodeHashes,
-            long timeoutInMilliSeconds) {
+    public Map<PlanNodeWithHash, HistoricalPlanStatistics> getHboStats(List<PlanNodeWithHash> planNodeHashes) {
         return planNodeHashes.stream().collect(toImmutableMap(
                 planNodeWithHash -> planNodeWithHash,
                 planNodeWithHash -> {
@@ -57,8 +56,8 @@ public class InMemoryHistoryBasedPlanStatisticsProvider
     }
 
     @Override
-    public void putStats(Map<PlanNodeWithHash, HistoricalPlanStatistics> hashesAndStatistics) {
-        hashesAndStatistics.forEach((planNodeWithHash, historicalPlanStatistics) -> {
+    public void putHboStats(Map<PlanNodeWithHash, HistoricalPlanStatistics> hashesStatisticsMap) {
+        hashesStatisticsMap.forEach((planNodeWithHash, historicalPlanStatistics) -> {
             if (planNodeWithHash.getHash().isPresent()) {
                 cache.put(planNodeWithHash.getHash().get(), historicalPlanStatistics);
             }

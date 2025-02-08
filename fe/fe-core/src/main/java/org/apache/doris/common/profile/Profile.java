@@ -491,6 +491,7 @@ public class Profile {
     }
 
     public void publishHistoricalStatistics(String queryId, List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
+        // global hbo manager
         HistoryBasedPlanStatisticsManager hboManager = HistoryBasedPlanStatisticsManager.getInstance();
         InMemoryHistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider = (InMemoryHistoryBasedPlanStatisticsProvider)
                 hboManager.getHistoryBasedPlanStatisticsProvider();
@@ -506,8 +507,8 @@ public class Profile {
             Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(queryId, idToPlanMap,
                     planToIdMap, planNodeRuntimeStatsItems);
             Map<PlanNodeWithHash, HistoricalPlanStatistics> historicalPlanStatisticsMap =
-                    historyBasedPlanStatisticsProvider.getStats(
-                            planStatistics.keySet().stream().collect(toImmutableList()), 1000);
+                    historyBasedPlanStatisticsProvider.getHboStats(
+                            planStatistics.keySet().stream().collect(toImmutableList()));
 
             // update plan statistics
             Map<PlanNodeWithHash, HistoricalPlanStatistics> newPlanStatistics = planStatistics.entrySet().stream()
@@ -528,7 +529,7 @@ public class Profile {
 
             // publish stats and refresh cache
             if (!newPlanStatistics.isEmpty()) {
-                historyBasedPlanStatisticsProvider.putStats(ImmutableMap.copyOf(newPlanStatistics));
+                historyBasedPlanStatisticsProvider.putHboStats(ImmutableMap.copyOf(newPlanStatistics));
             }
             historyBasedStatisticsCacheManager.invalidate(queryId);
         }

@@ -47,7 +47,7 @@ public class HistoryBasedStatisticsCacheManager
 
     public HistoryBasedStatisticsCacheManager() {}
 
-    public LoadingCache<PlanNodeWithHash, HistoricalPlanStatistics> getStatisticsCache(String queryId, HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider, long timeoutInMilliSeconds)
+    public LoadingCache<PlanNodeWithHash, HistoricalPlanStatistics> getStatisticsCache(String queryId, HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider)
     {
         return statisticsCache.computeIfAbsent(queryId, ignored -> CacheBuilder.newBuilder()
                 .build(new CacheLoader<PlanNodeWithHash, HistoricalPlanStatistics>()
@@ -61,8 +61,8 @@ public class HistoryBasedStatisticsCacheManager
                     @Override
                     public Map<PlanNodeWithHash, HistoricalPlanStatistics> loadAll(Iterable<? extends PlanNodeWithHash> keys)
                     {
-                        Map<PlanNodeWithHash, HistoricalPlanStatistics> statistics = new HashMap<>(historyBasedPlanStatisticsProvider.getStats(
-                                ImmutableList.copyOf(keys), timeoutInMilliSeconds));
+                        Map<PlanNodeWithHash, HistoricalPlanStatistics> statistics = new HashMap<>(historyBasedPlanStatisticsProvider.getHboStats(
+                                ImmutableList.copyOf(keys)));
                         // loadAll excepts all keys to be written
                         for (PlanNodeWithHash key : keys) {
                             statistics.putIfAbsent(key, HistoricalPlanStatistics.empty());

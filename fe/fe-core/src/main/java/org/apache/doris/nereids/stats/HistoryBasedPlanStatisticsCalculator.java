@@ -141,7 +141,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         }
         PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash(planNode, Optional.of(hash));
         HistoricalPlanStatistics planStatistics = historyBasedStatisticsCacheManager
-                .getStatisticsCache(queryId, historyBasedPlanStatisticsProvider, 1000)
+                .getStatisticsCache(queryId, historyBasedPlanStatisticsProvider)
                 .getUnchecked(planNodeWithHash);
 
         Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(planNode, true);
@@ -182,7 +182,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
             String hash = scan.hboTreeString();
             hash = hashCanonicalPlan(hash);
             PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash(scan, Optional.of(hash));
-            HistoricalPlanStatistics historicalPlanStatistics = historyBasedPlanStatisticsProvider.getStats(planNodeWithHash);
+            HistoricalPlanStatistics historicalPlanStatistics = historyBasedPlanStatisticsProvider.getHboStats(planNodeWithHash);
             if (historicalPlanStatistics.equals(historicalPlanStatistics.empty())) {
                 return Optional.empty();
             } else {
