@@ -83,7 +83,8 @@ public class PhysicalFilter<CHILD_TYPE extends Plan> extends PhysicalUnary<CHILD
 
     @Override
     public String toHboString() {
-        return Utils.toSqlString("PhysicalFilter" + getGroupIdWithPrefix(),
+        // id.asInt() is different from logical filter and physical filter
+        return Utils.toSqlString("Filter[" + getGroupIdWithPrefix() + "]",
                 "predicates", getPredicate()
         );
     }
