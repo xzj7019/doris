@@ -24,7 +24,9 @@ public class PlanStatistics {
     private final long inputRows;
     private final long outputRows;
     private final long commonFilteredRows;
+    private final long commonFilterInputRows;
     private final long runtimeFilteredRows;
+    private final long runtimeFilterInputRows;
     private final long joinBuilderRows;
     private final long joinProbeRows;
     private final int joinBuilderSkewRatio;
@@ -32,18 +34,21 @@ public class PlanStatistics {
     private final int instanceNum;
 
     public static final PlanStatistics EMPTY = new PlanStatistics(
-            -1, -1, -1, -1, -1,
+            -1, -1, -1, -1, -1, -1, -1,
             -1, -1, -1, -1, -1);
 
     public PlanStatistics(int nodeId, long inputRows, long outputRows,
-                        long commonFilteredRows, long runtimeFilteredRows,
+                        long commonFilteredRows, long commonFilterInputRows,
+                        long runtimeFilteredRows, long runtimeFilterInputRows,
                         long joinBuilderRows, long joinProbeRows,
                         int joinBuilderSkewRatio, int joinProbeSkewRatio, int instanceNum) {
         this.nodeId = nodeId;
         this.inputRows = inputRows;
         this.outputRows = outputRows;
         this.commonFilteredRows = commonFilteredRows;
+        this.commonFilterInputRows = commonFilterInputRows;
         this.runtimeFilteredRows = runtimeFilteredRows;
+        this.runtimeFilterInputRows = runtimeFilterInputRows;
         this.joinBuilderRows = joinBuilderRows;
         this.joinProbeRows = joinProbeRows;
         this.joinBuilderSkewRatio = joinBuilderSkewRatio;
@@ -53,7 +58,8 @@ public class PlanStatistics {
 
     public static PlanStatistics buildFromStatsItem(TPlanNodeRuntimeStatsItem item) {
         return new PlanStatistics(item.getNodeId(), item.getInputRows(), item.getOutputRows(), item.getCommonFilterRows(),
-                item.getRuntimeFilterRows(), item.getJoinBuilderRows(), item.getJoinProbeRows(),
+                item.getCommonFilterInputRows(), item.getRuntimeFilterRows(), item.getRuntimeFilterInputRows(),
+                item.getJoinBuilderRows(), item.getJoinProbeRows(),
                 item.getJoinBuilderSkewRatio(), item.getJoinProberSkewRatio(), item.getInstanceNum());
     }
 
@@ -68,6 +74,9 @@ public class PlanStatistics {
     public long getCommonFilteredRows() { return commonFilteredRows; }
 
     public long getRuntimeFilteredRows() { return runtimeFilteredRows; }
+    public long getCommonFilterInputRows() { return commonFilterInputRows; }
+
+    public long getRuntimeFilterInputRows() { return runtimeFilterInputRows; }
 
     public long getJoinBuilderRows() { return joinBuilderRows; }
 
@@ -84,7 +93,9 @@ public class PlanStatistics {
         private long inputRows;
         private long outputRows;
         private long commonFilteredRows;
+        private long commonFilterInputRows;
         private long runtimeFilteredRows;
+        private long runtimeFilterInputRows;
         private long joinBuilderRows;
         private long joinProbeRows;
         private int joinBuilderSkewRatio;
@@ -96,14 +107,16 @@ public class PlanStatistics {
         }
 
         public Builder(int nodeId, long inputRows, long outputRows,
-                long commonFilteredRows, long runtimeFilteredRows,
+                long commonFilteredRows, long commonFilterInputRows, long runtimeFilteredRows, long runtimeFilterInputRows,
                 long joinBuilderRows, long joinProbeRows,
                 int joinBuilderSkewRatio, int joinProbeSkewRatio, int instanceNum) {
             this.nodeId = nodeId;
             this.inputRows = inputRows;
             this.outputRows = outputRows;
             this.commonFilteredRows = commonFilteredRows;
+            this.commonFilterInputRows = commonFilterInputRows;
             this.runtimeFilteredRows = runtimeFilteredRows;
+            this.runtimeFilterInputRows = runtimeFilterInputRows;
             this.joinBuilderRows = joinBuilderRows;
             this.joinProbeRows = joinProbeRows;
             this.joinBuilderSkewRatio = joinBuilderSkewRatio;
@@ -112,13 +125,14 @@ public class PlanStatistics {
         }
 
         public PlanStatistics build() {
-            return new PlanStatistics(nodeId, inputRows, outputRows, commonFilteredRows, runtimeFilteredRows,
+            return new PlanStatistics(nodeId, inputRows, outputRows, commonFilteredRows, commonFilterInputRows, runtimeFilteredRows, runtimeFilterInputRows,
                     joinBuilderRows, joinProbeRows, joinBuilderSkewRatio, joinProbeSkewRatio, instanceNum);
         }
 
         public static Builder buildFrom(PlanStatistics execStats) {
             return new Builder(execStats.getNodeId(), execStats.getInputRows(), execStats.getOutputRows(), execStats.getCommonFilteredRows(),
-                    execStats.getRuntimeFilteredRows(), execStats.getJoinBuilderRows(), execStats.getJoinProbeRows(),
+                    execStats.getCommonFilterInputRows(),
+                    execStats.getRuntimeFilteredRows(), execStats.getRuntimeFilterInputRows(), execStats.getJoinBuilderRows(), execStats.getJoinProbeRows(),
                     execStats.getJoinBuilderSkewRatio(), execStats.getJoinProbeSkewRatio(), execStats.getInstanceNum());
         }
 
