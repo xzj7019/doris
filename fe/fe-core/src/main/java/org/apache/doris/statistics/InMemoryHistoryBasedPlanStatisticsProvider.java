@@ -17,28 +17,34 @@
 
 package org.apache.doris.statistics;
 
+import org.apache.doris.common.Config;
+import org.apache.doris.common.ConfigBase.DefaultConfHandler;
+import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.planner.PlanNodeWithHash;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+
+import java.lang.reflect.Field;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 
 public class InMemoryHistoryBasedPlanStatisticsProvider
         implements HistoryBasedPlanStatisticsProvider {
-    private final Map<String, HistoricalPlanStatistics> cache = new ConcurrentHashMap<>();
-    // Since, event processing happens in a different thread, we use a semaphore to wait for
-    // all query events to process and finish.
-    private final Semaphore semaphore = new Semaphore(1);
-
+    private volatile Cache<String, HistoricalPlanStatistics> hboCache;
     public InMemoryHistoryBasedPlanStatisticsProvider() {
-        semaphore.acquireUninterruptibly();
+        hboCache = buildHboCaches(
+                Config.hbo_cache_manage_num,
+                Config.expire_hbo_cache_in_fe_second
+        );
     }
 
     @Override
     public HistoricalPlanStatistics getHboStats(PlanNodeWithHash planNodeWithHash) {
         if (planNodeWithHash.getHash().isPresent()) {
-             return cache.getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
+             return hboCache.asMap().getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
         }
         return HistoricalPlanStatistics.empty();
     }
@@ -49,7 +55,7 @@ public class InMemoryHistoryBasedPlanStatisticsProvider
                 planNodeWithHash -> planNodeWithHash,
                 planNodeWithHash -> {
                     if (planNodeWithHash.getHash().isPresent()) {
-                        return cache.getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
+                        return hboCache.asMap().getOrDefault(planNodeWithHash.getHash().get(), HistoricalPlanStatistics.empty());
                     }
                     return HistoricalPlanStatistics.empty();
                 }));
@@ -59,9 +65,55 @@ public class InMemoryHistoryBasedPlanStatisticsProvider
     public void putHboStats(Map<PlanNodeWithHash, HistoricalPlanStatistics> hashesStatisticsMap) {
         hashesStatisticsMap.forEach((planNodeWithHash, historicalPlanStatistics) -> {
             if (planNodeWithHash.getHash().isPresent()) {
-                cache.put(planNodeWithHash.getHash().get(), historicalPlanStatistics);
+                hboCache.put(planNodeWithHash.getHash().get(), historicalPlanStatistics);
             }
         });
-        semaphore.release();
+    }
+
+    private static Cache<String, HistoricalPlanStatistics> buildHboCaches(int hboCacheNum,
+            long expireAfterAccessSeconds) {
+        Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder()
+                // auto evict cache when jvm memory too low
+                .softValues();
+        if (hboCacheNum > 0) {
+            cacheBuilder.maximumSize(hboCacheNum);
+        }
+        if (expireAfterAccessSeconds > 0) {
+            cacheBuilder = cacheBuilder.expireAfterAccess(Duration.ofSeconds(expireAfterAccessSeconds));
+        }
+
+        return cacheBuilder.build();
+    }
+
+    // NOTE: used in Config.sql_cache_manage_num.callbackClassString and
+    //       Config.cache_last_version_interval_second.callbackClassString,
+    //       don't remove it!
+    public static class UpdateConfig extends DefaultConfHandler {
+        @Override
+        public void handle(Field field, String confVal) throws Exception {
+            super.handle(field, confVal);
+            InMemoryHistoryBasedPlanStatisticsProvider.updateConfig();
+        }
+    }
+
+    public static synchronized void updateConfig() {
+        HistoryBasedPlanStatisticsManager hboManger = HistoryBasedPlanStatisticsManager.getInstance();
+        if (hboManger == null) {
+            return;
+        }
+        HistoryBasedPlanStatisticsProvider hboProvider = hboManger.getHistoryBasedPlanStatisticsProvider();
+        if (!(hboProvider instanceof InMemoryHistoryBasedPlanStatisticsProvider)) {
+            return;
+        }
+
+        InMemoryHistoryBasedPlanStatisticsProvider inMemHboProvider =
+                (InMemoryHistoryBasedPlanStatisticsProvider) hboProvider;
+
+        Cache<String, HistoricalPlanStatistics> hboCaches = buildHboCaches(
+                Config.sql_cache_manage_num,
+                Config.expire_sql_cache_in_fe_second
+        );
+        hboCaches.putAll(inMemHboProvider.hboCache.asMap());
+        inMemHboProvider.hboCache = hboCaches;
     }
 }
