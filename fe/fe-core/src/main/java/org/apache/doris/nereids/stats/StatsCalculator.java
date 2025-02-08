@@ -198,6 +198,15 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
         this.cascadesContext = context;
     }
 
+    /**
+     * StatsCalculator
+     * @param groupExpression
+     * @param forbidUnknownColStats
+     * @param columnStatisticMap
+     * @param isPlayNereidsDump
+     * @param cteIdToStats
+     * @param context
+     */
     public StatsCalculator(GroupExpression groupExpression, boolean forbidUnknownColStats,
             Map<String, ColumnStatistic> columnStatisticMap, boolean isPlayNereidsDump,
             Map<CTEId, Statistics> cteIdToStats, CascadesContext context) {
@@ -271,7 +280,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
                         LOG.info("disable join reorder since col stats invalid: "
                                 + reason.get());
                     } catch (Exception e) {
-                        LOG.info("disableNereidsJoinReorderOnce failed");
+                        LOG.info("disable NereidsJoinReorderOnce failed");
                     }
                     return reason;
                 }

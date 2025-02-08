@@ -37,7 +37,6 @@ import java.util.concurrent.ExecutorService;
 public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
     private static final Logger LOG = LogManager.getLogger(HistoryBasedPlanStatisticsManager.class);
     private static volatile HistoryBasedPlanStatisticsManager INSTANCE = null;
-    private final HistoryBasedStatisticsCacheManager historyBasedStatisticsCacheManager;
     //private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
     private HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider;
 
@@ -50,9 +49,8 @@ public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
         historyBasedPlanStatisticsProvider = new InMemoryHistoryBasedPlanStatisticsProvider();
         hboExecutor = ThreadPoolManager.newDaemonFixedThreadPool(
                 20, 100, "hbo-thread-pool", true);
-        historyBasedStatisticsCacheManager = new HistoryBasedStatisticsCacheManager();
         historyBasedIdToPlanMapProvider = new HistoryBasedIdToPlanMapProvider();
-        //planCanonicalInfoProvider = new CachingPlanCanonicalInfoProvider(historyBasedStatisticsCacheManager, newObjectMapper, metadata);
+        //planCanonicalInfoProvider = new CachingPlanCanonicalInfoProvider(historyBasedPlanStatisticsProvider, newObjectMapper, metadata);
     }
 
     public static HistoryBasedPlanStatisticsManager getInstance() {
@@ -69,10 +67,6 @@ public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
 
     public HistoryBasedPlanStatisticsProvider getHistoryBasedPlanStatisticsProvider() {
         return historyBasedPlanStatisticsProvider;
-    }
-
-    public HistoryBasedStatisticsCacheManager getHistoryBasedStatisticsCacheManager() {
-        return historyBasedStatisticsCacheManager;
     }
 
     public HistoryBasedIdToPlanMapProvider getHistoryBasedIdToPlanMapProvider() {

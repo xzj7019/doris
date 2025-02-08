@@ -17,7 +17,6 @@
 
 package org.apache.doris.statistics;
 
-import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 
@@ -68,6 +67,7 @@ public class HistoricalPlanStatisticsEntry
     @Override
     public String toString()
     {
-        return format("HistoricalPlanStatisticsEntry{planStatistics=%s, inputTableStatistics=%s, historicalPlanStatisticsEntryInfo=%s}", planStatistics, inputTableStatistics);
+        return String.format("HistoricalPlanStatisticsEntry{planStatistics=%s, inputTableStatistics=%s,"
+                + "historicalPlanStatisticsEntryInfo=%s}", planStatistics, inputTableStatistics);
     }
 }

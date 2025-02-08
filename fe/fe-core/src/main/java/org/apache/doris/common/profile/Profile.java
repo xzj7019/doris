@@ -23,7 +23,6 @@ import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.RuntimeProfile;
 import org.apache.doris.nereids.NereidsPlanner;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
-import org.apache.doris.nereids.stats.HistoryBasedStatisticsCacheManager;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
@@ -36,21 +35,17 @@ import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalRelation;
-import org.apache.doris.planner.PlanNode;
 import org.apache.doris.planner.PlanNodeWithHash;
 import org.apache.doris.planner.Planner;
 import org.apache.doris.statistics.HistoricalPlanStatistics;
 import org.apache.doris.statistics.HistoricalPlanStatisticsEntry;
 import org.apache.doris.statistics.HistoryBasedIdToPlanMapProvider;
-import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
 import org.apache.doris.statistics.HistoryBasedSourceInfo;
 import org.apache.doris.statistics.InMemoryHistoryBasedPlanStatisticsProvider;
 import org.apache.doris.statistics.PlanNodeCanonicalInfo;
 import org.apache.doris.statistics.PlanStatistics;
 import org.apache.doris.statistics.PlanStatisticsWithSourceInfo;
-import org.apache.doris.thrift.TNodeExecStatsItemPB;
 import org.apache.doris.thrift.TPlanNodeRuntimeStatsItem;
-import org.apache.doris.thrift.TQueryStatistics;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -59,9 +54,7 @@ import com.google.common.collect.ImmutableMap;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
-import static com.google.common.graph.Traverser.forTree;
 import static com.google.common.hash.Hashing.sha256;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -85,7 +78,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
@@ -495,7 +487,6 @@ public class Profile {
         HistoryBasedPlanStatisticsManager hboManager = HistoryBasedPlanStatisticsManager.getInstance();
         InMemoryHistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider = (InMemoryHistoryBasedPlanStatisticsProvider)
                 hboManager.getHistoryBasedPlanStatisticsProvider();
-        HistoryBasedStatisticsCacheManager historyBasedStatisticsCacheManager = hboManager.getHistoryBasedStatisticsCacheManager();
 
         // get idToPlanMap
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
@@ -531,7 +522,6 @@ public class Profile {
             if (!newPlanStatistics.isEmpty()) {
                 historyBasedPlanStatisticsProvider.putHboStats(ImmutableMap.copyOf(newPlanStatistics));
             }
-            historyBasedStatisticsCacheManager.invalidate(queryId);
         }
     }
 

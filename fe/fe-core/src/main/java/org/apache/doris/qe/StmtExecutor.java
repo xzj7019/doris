@@ -148,8 +148,6 @@ import org.apache.doris.nereids.glue.LogicalPlanAdapter;
 import org.apache.doris.nereids.minidump.MinidumpUtils;
 import org.apache.doris.nereids.parser.NereidsParser;
 import org.apache.doris.nereids.rules.exploration.mv.InitMaterializationContextHook;
-import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsTracker;
-import org.apache.doris.nereids.stats.HistoryBasedStatisticsCacheManager;
 import org.apache.doris.nereids.trees.plans.commands.Command;
 import org.apache.doris.nereids.trees.plans.commands.CreatePolicyCommand;
 import org.apache.doris.nereids.trees.plans.commands.CreateTableCommand;
@@ -193,8 +191,6 @@ import org.apache.doris.rpc.BackendServiceProxy;
 import org.apache.doris.rpc.RpcException;
 import org.apache.doris.service.ExecuteEnv;
 import org.apache.doris.service.FrontendOptions;
-import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
-import org.apache.doris.statistics.InMemoryHistoryBasedPlanStatisticsProvider;
 import org.apache.doris.statistics.ResultRow;
 import org.apache.doris.statistics.util.InternalQueryBuffer;
 import org.apache.doris.system.Backend;
@@ -253,7 +249,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -294,7 +289,6 @@ public class StmtExecutor {
     // The profile of this execution
     private final Profile profile;
     private Boolean isForwardedToMaster = null;
-    private HistoryBasedPlanStatisticsTracker historyBasedPlanStatisticsTracker;
 
     // The result schema if "dry_run_query" is true.
     // Only one column to indicate the real return row numbers.
@@ -314,11 +308,6 @@ public class StmtExecutor {
                 this.context.getSessionVariable().enableProfile(),
                 this.context.getSessionVariable().getProfileLevel(),
                 this.context.getSessionVariable().getAutoProfileThresholdMs());
-        //this.historyBasedPlanStatisticsTracker = new HistoryBasedPlanStatisticsTracker(
-        //        context,
-        //        new InMemoryHistoryBasedPlanStatisticsProvider(),
-        //        new HistoryBasedStatisticsCacheManager());
-        //this.statementContext.setHistoryBasedPlanStatisticsTracker(historyBasedPlanStatisticsTracker);
     }
 
     // for test
@@ -352,14 +341,6 @@ public class StmtExecutor {
                             context.getSessionVariable().enableProfile(),
                             context.getSessionVariable().getProfileLevel(),
                             context.getSessionVariable().getAutoProfileThresholdMs());
-        //this.historyBasedPlanStatisticsTracker = new HistoryBasedPlanStatisticsTracker(
-        //        context, new InMemoryHistoryBasedPlanStatisticsProvider(),
-        //        new HistoryBasedStatisticsCacheManager());
-        //this.statementContext.setHistoryBasedPlanStatisticsTracker(historyBasedPlanStatisticsTracker);
-    }
-
-    public HistoryBasedPlanStatisticsTracker getHistoryBasedPlanStatisticsTracker() {
-        return historyBasedPlanStatisticsTracker;
     }
 
     public boolean isProxy() {

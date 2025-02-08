@@ -272,7 +272,7 @@ public abstract class AbstractPhysicalJoin<
                 "hashCondition", hashJoinConjuncts,
                 "otherCondition", otherJoinConjuncts,
                 "markCondition", markJoinConjuncts);
-        return Utils.toSqlString("JOIN",// + getGroupIdWithPrefix(),
+        return Utils.toSqlString("JOIN", // + getGroupIdWithPrefix(),
                 args.toArray());
     }
 

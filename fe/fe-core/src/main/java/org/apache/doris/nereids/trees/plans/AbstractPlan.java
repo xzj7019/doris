@@ -118,6 +118,10 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
         return "";
     }
 
+    /**
+     * hboTreeString
+     * @return
+     */
     public String hboTreeString() {
         StringBuilder builder = new StringBuilder();
         builder.append(this.toHboString());
@@ -125,8 +129,10 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
             return builder.toString();
         } else {
             for (Plan plan : children) {
-                if (plan instanceof GroupPlan && ((GroupPlan) plan).getGroup().getLogicalExpressions().get(0).getPlan() instanceof LogicalPlan) {
-                    LogicalPlan logicalPlan = (LogicalPlan) ((GroupPlan) plan).getGroup().getLogicalExpressions().get(0).getPlan();
+                if (plan instanceof GroupPlan && ((GroupPlan) plan).getGroup().getLogicalExpressions()
+                        .get(0).getPlan() instanceof LogicalPlan) {
+                    LogicalPlan logicalPlan = (LogicalPlan) ((GroupPlan) plan).getGroup()
+                            .getLogicalExpressions().get(0).getPlan();
                     builder.append(((AbstractPlan) logicalPlan).hboTreeString());
                 } else if (plan instanceof LogicalPlan) {
                     builder.append(((AbstractPlan) plan).hboTreeString());
