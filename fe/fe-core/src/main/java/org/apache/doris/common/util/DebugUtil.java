@@ -246,13 +246,13 @@ public class DebugUtil {
             return result.toString();
         }
 
-        result.append(String.format("%-10s %-10s %-15s %-15s %-15s %-15s %-15s %-15s %-15s %-15s\n", 
+        result.append(String.format("%-10s %-10s %-15s %-15s %-15s %-15s %-15s %-15s %-15s %-15s %-10s %-10s\n",
             "NodeID", "InstanceNum", "InputRows", "OutputRows", "CommonFilterRows", "CommonFilterInputRows",
             "RuntimeFilterRows", "RuntimeFilterInputRows", "JoinBuilderRows", "JoinProbeRows", "JoinBuilderSkewRatio",
             "JoinProbeSkewRatio"));
 
         for (TPlanNodeRuntimeStatsItem item : planNodeRuntimeStatsItems) {
-            result.append(String.format("%-10d %-10d %-15d %-15d %-15d %-15d %-15d %-15d %-15d %-15d %-15d %-15d\n",
+            result.append(String.format("%-10d %-10d %-15d %-15d %-15d %-15d %-15d %-15d %-15d %-15d %-10d %-10d\n",
                 item.getNodeId(),
                 item.getInstanceNum(),
                 item.getInputRows(),
