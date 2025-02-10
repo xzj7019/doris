@@ -456,11 +456,9 @@ public class Profile {
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
             int nodeId = nodeStats.node_id;
             PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
-            // check plan statistics validity
-            boolean isRFSafeNode = planStatistics.isRuntimeFilterSafeNode();
             PhysicalPlan planNode = idToPlanMap.get(nodeId);
             // non-rfsafe node's plan stats info will NOT be collected and used in hbo stats calculating
-            if (planNode != null && isRFSafeNode) {
+            if (planNode != null) {
                 buildPlanNodeToInfoMap(planNode, planToIdMap, planNodeRuntimeStatsItems, planToInfoMap);
                 Optional<PlanNodeCanonicalInfo> planNodeCanonicalInfo = Optional.ofNullable(
                         planToInfoMap.get(planNode));
@@ -533,9 +531,10 @@ public class Profile {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
 
         List<HistoricalPlanStatisticsEntry> newLastRunsStatistics = new ArrayList<>(lastRunsStatistics);
-
+        // update phase anyway to allow rf safe or not
+        // check it in the using phase
         Optional<Integer> similarStatsIndex = getSimilarStatsIndex(historicalPlanStatistics,
-                inputTableStatistics, 0.1);
+                inputTableStatistics, 0.1, 1.0);
         if (similarStatsIndex.isPresent()) {
             newLastRunsStatistics.remove(similarStatsIndex.get().intValue());
         }
@@ -552,7 +551,7 @@ public class Profile {
     public static Optional<Integer> getSimilarStatsIndex(
             HistoricalPlanStatistics historicalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
-            double threshold)
+            double threshold, double hboRfSafeThreshold)
     {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
 
@@ -569,11 +568,17 @@ public class Profile {
             //boolean outputSizeSimilarity = true;
 
             // Match to historical stats only when size of input tables are similar to those of historical runs.
-            for (int inputTablesIndex = 0; inputTablesIndex < inputTableStatistics.size(); ++inputTablesIndex) {
+            for (int inputTablesIndex = 0; rowSimilarity && inputTablesIndex < inputTableStatistics.size(); ++inputTablesIndex) {
                 PlanStatistics currentInputStatistics = inputTableStatistics.get(inputTablesIndex);
                 PlanStatistics historicalInputStatistics = lastRunsStatistics.get(lastRunsIndex).getInputTableStatistics().get(inputTablesIndex);
-
-                rowSimilarity = rowSimilarity && similarStats(currentInputStatistics.getOutputRows(), historicalInputStatistics.getOutputRows(), threshold);
+                // check if rf safe
+                boolean isRFSafe = historicalInputStatistics.isRuntimeFilterSafeNode(hboRfSafeThreshold);
+                if (!isRFSafe) {
+                    rowSimilarity = false;
+                } else {
+                    rowSimilarity = rowSimilarity && similarStats(currentInputStatistics.getOutputRows(),
+                            historicalInputStatistics.getOutputRows(), threshold);
+                }
                 //outputSizeSimilarity = outputSizeSimilarity && similarStats(currentInputStatistics.getOutputSize().getValue(), historicalInputStatistics.getOutputSize().getValue(), threshold);
             }
             // Write information if both rows and output size are similar.

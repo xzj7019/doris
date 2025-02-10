@@ -89,16 +89,15 @@ public class PlanStatistics {
 
     public int getInstanceNum() { return instanceNum; }
 
-    public boolean isRuntimeFilterSafeNode() {
+    public boolean isRuntimeFilterSafeNode(double rfSafeThreshold) {
         ConnectContext ctx = ConnectContext.get();
         if (runtimeFilteredRows == 0 && runtimeFilterInputRows == 0) {
             return true;
         } else if (runtimeFilteredRows > 0 && runtimeFilterInputRows > 0
                 && runtimeFilterInputRows >= runtimeFilteredRows) {
-            if (ctx != null && ctx.getSessionVariable() != null) {
-                double rfSafeThreshold = ctx.getSessionVariable().getHboRfSafeThreshold();
-                double rfFilterRatio = (double) (runtimeFilteredRows / runtimeFilterInputRows);
-                return rfFilterRatio > rfSafeThreshold;
+            if (rfSafeThreshold > 0) {
+                double rfFilterRatio = (double) (100 * runtimeFilteredRows / runtimeFilterInputRows);
+                return rfFilterRatio < 100 * rfSafeThreshold;
             } else {
                 return false;
             }

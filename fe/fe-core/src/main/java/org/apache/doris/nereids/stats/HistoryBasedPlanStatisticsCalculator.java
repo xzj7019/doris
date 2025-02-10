@@ -95,9 +95,14 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(planNode, true);
         // TODO: get current inputTableStatistics
         if (inputTableStatistics.isPresent()) {
+            double hboRfsafeThreshold = -1.0;
+            if (cascadesContext.getConnectContext() != null
+                    && cascadesContext.getConnectContext().getSessionVariable() != null) {
+                hboRfsafeThreshold = cascadesContext.getConnectContext().getSessionVariable().getHboRfSafeThreshold();
+            }
             Optional<HistoricalPlanStatisticsEntry> historicalPlanStatisticsEntry
                     = getSelectedHistoricalPlanStatisticsEntry
-                    (planStatistics, inputTableStatistics.get(), 0.1);
+                    (planStatistics, inputTableStatistics.get(), 0.1, hboRfsafeThreshold);
             if (historicalPlanStatisticsEntry.isPresent()) {
                 PlanStatistics predictedPlanStatistics = historicalPlanStatisticsEntry.get().getPlanStatistics();
                 // todo: choose which one is the output rows count
@@ -148,14 +153,15 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
     public static Optional<HistoricalPlanStatisticsEntry> getSelectedHistoricalPlanStatisticsEntry(
             HistoricalPlanStatistics historicalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
-            double historyMatchingThreshold) {
+            double historyMatchingThreshold,
+            double hboRfSafeThreshold) {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
         if (lastRunsStatistics.isEmpty()) {
             return Optional.empty();
         }
 
         Optional<Integer> similarStatsIndex = getSimilarStatsIndex(historicalPlanStatistics,
-                inputTableStatistics, historyMatchingThreshold);
+                inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
 
         if (similarStatsIndex.isPresent()) {
             return Optional.of(lastRunsStatistics.get(similarStatsIndex.get()));
