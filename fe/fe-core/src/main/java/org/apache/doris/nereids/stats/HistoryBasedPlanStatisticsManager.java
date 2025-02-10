@@ -17,20 +17,11 @@
 
 package org.apache.doris.nereids.stats;
 
-import org.apache.doris.common.Config;
 import org.apache.doris.common.ThreadPoolManager;
-import org.apache.doris.common.profile.ProfileManager;
 import org.apache.doris.common.util.MasterDaemon;
 import org.apache.doris.statistics.HistoryBasedIdToPlanMapProvider;
 import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
 import org.apache.doris.statistics.InMemoryHistoryBasedPlanStatisticsProvider;
-
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import static java.util.Objects.requireNonNull;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.ExecutorService;
 

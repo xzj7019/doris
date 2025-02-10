@@ -447,7 +447,7 @@ public class Profile {
         }
     }
 
-    public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> getQueryStats(String queryId, // queryId is useless
+    public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> getQueryStats(
             Map<Integer, PhysicalPlan> idToPlanMap, Map<PhysicalPlan, Integer> planToIdMap,
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
         Map<PhysicalPlan, PlanNodeCanonicalInfo> planToInfoMap = new HashMap<>();
@@ -493,7 +493,7 @@ public class Profile {
         // find the idToPlan entry
         if (!idToPlanMap.isEmpty()) {
             // get plan statistics
-            Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(queryId, idToPlanMap,
+            Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(idToPlanMap,
                     planToIdMap, planNodeRuntimeStatsItems);
             Map<PlanNodeWithHash, HistoricalPlanStatistics> historicalPlanStatisticsMap =
                     historyBasedPlanStatisticsProvider.getHboStats(
