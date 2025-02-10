@@ -430,10 +430,8 @@ public class NereidsPlanner extends Planner {
 
     private void collectExecStatsIds(String queryId, PhysicalPlan root, PlanFragment fragment,
             PlanTranslatorContext context) {
-        if (ConnectContext.get() == null || cascadesContext == null) {
-            return;
-        }
-        if (!ConnectContext.get().getSessionVariable().isEnableHboTracker()) {
+        if (ConnectContext.get() == null || ConnectContext.get().getSessionVariable() == null
+            || !ConnectContext.get().getSessionVariable().isEnableHboInfoCollection()) {
             return;
         }
         for (Object child : root.children()) {
@@ -444,7 +442,6 @@ public class NereidsPlanner extends Planner {
             PlanNodeId planId = context.getNereidsIdToPlanNodeIdMap().get(nodeId);
             if (planId != null) {
                 fragment.getCollectExecStatsIds().add(planId.asInt());
-                //cascadesContext.getNeedStatsPlanIdNodeMap().put(planId.asInt(), root);
                 Map<Integer, PhysicalPlan> idToPlanMap = HistoryBasedPlanStatisticsManager.getInstance()
                         .getHistoryBasedIdToPlanMapProvider().getIdToPlanMap(queryId);
                 Map<PhysicalPlan, Integer> planToIdMap = HistoryBasedPlanStatisticsManager.getInstance()
@@ -452,11 +449,15 @@ public class NereidsPlanner extends Planner {
                 if (idToPlanMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().putIdToPlanMap(queryId, idToPlanMap);
+                } else {
+                    idToPlanMap.put(planId.asInt(), root);
+                }
+                if (planToIdMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().putPlanToIdMap(queryId, planToIdMap);
+                } else {
+                    planToIdMap.put(root, planId.asInt());
                 }
-                idToPlanMap.put(planId.asInt(), root);
-                planToIdMap.put(root, planId.asInt());
             }
         }
     }

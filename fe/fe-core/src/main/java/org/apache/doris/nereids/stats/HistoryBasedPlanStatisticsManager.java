@@ -35,7 +35,6 @@ import org.apache.logging.log4j.Logger;
 import java.util.concurrent.ExecutorService;
 
 public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
-    private static final Logger LOG = LogManager.getLogger(HistoryBasedPlanStatisticsManager.class);
     private static volatile HistoryBasedPlanStatisticsManager INSTANCE = null;
     //private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
     private HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider;

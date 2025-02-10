@@ -327,10 +327,8 @@ public class SessionVariable implements Serializable, Writable {
     public static final String ENABLE_DPHYP_OPTIMIZER = "enable_dphyp_optimizer";
     public static final String DPHYPER_LIMIT = "dphyper_limit";
     public static final String ENABLE_LEFT_ZIG_ZAG = "enable_left_zig_zag";
-
     public static final String ENABLE_HBO_OPTIMIZATION = "enable_hbo_optimization";
-
-    public static final String ENABLE_HBO_TRACKER = "enable_hbo_tracker";
+    public static final String ENABLE_HBO_INFO_COLLECTION = "enable_hbo_info_collection";
     public static final String HBO_RFSAFE_THRESHOLD = "hbo_rfsafe_threshold";
     public static final String NTH_OPTIMIZED_PLAN = "nth_optimized_plan";
 
@@ -1441,15 +1439,15 @@ public class SessionVariable implements Serializable, Writable {
     @VariableMgr.VarAttr(name = ENABLE_HBO_OPTIMIZATION)
     private boolean enableHboOptimization = false;
 
-    public boolean isEnableHboTracker() {
-        return enableHboTracker;
+    public boolean isEnableHboInfoCollection() {
+        return enableHboInfoCollection;
     }
 
-    @VariableMgr.VarAttr(name = ENABLE_HBO_TRACKER)
-    private boolean enableHboTracker = false;
+    @VariableMgr.VarAttr(name = ENABLE_HBO_INFO_COLLECTION)
+    private boolean enableHboInfoCollection = false;
 
-    @VariableMgr.VarAttr(name = "HBO_RFSAFE_THRESHOLD", needForward = true)
-    public double hboRfSafeThreshold = 0.5;
+    @VariableMgr.VarAttr(name = HBO_RFSAFE_THRESHOLD, needForward = true)
+    private double hboRfSafeThreshold = 1.0;
 
 
     /**

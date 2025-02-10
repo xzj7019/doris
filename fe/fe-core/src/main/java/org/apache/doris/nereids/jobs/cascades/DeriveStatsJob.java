@@ -108,9 +108,9 @@ public class DeriveStatsJob extends Job {
             ConnectContext connectContext = context.getCascadesContext().getConnectContext();
             SessionVariable sessionVariable = connectContext.getSessionVariable();
             boolean isHboEnabled = sessionVariable.isEnableHboOptimization();
-            boolean isHboTrackerOpened = sessionVariable.isEnableHboTracker();
+            boolean isHboInfoCollected = sessionVariable.isEnableHboInfoCollection();
             StatsCalculator statsCalculator;
-            if (isHboEnabled && isHboTrackerOpened) {
+            if (isHboEnabled && isHboInfoCollected) {
                 statsCalculator = new HistoryBasedPlanStatisticsCalculator(groupExpression,
                         sessionVariable.getForbidUnknownColStats(),
                         connectContext.getTotalColumnStatisticMap(),
