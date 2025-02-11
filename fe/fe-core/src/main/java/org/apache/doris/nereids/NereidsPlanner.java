@@ -442,22 +442,22 @@ public class NereidsPlanner extends Planner {
             PlanNodeId planId = context.getNereidsIdToPlanNodeIdMap().get(nodeId);
             if (planId != null) {
                 fragment.getCollectExecStatsIds().add(planId.asInt());
+                // fill id to plan map
                 Map<Integer, PhysicalPlan> idToPlanMap = HistoryBasedPlanStatisticsManager.getInstance()
                         .getHistoryBasedIdToPlanMapProvider().getIdToPlanMap(queryId);
-                Map<PhysicalPlan, Integer> planToIdMap = HistoryBasedPlanStatisticsManager.getInstance()
-                                .getHistoryBasedIdToPlanMapProvider().getPlanToIdMap(queryId);
                 if (idToPlanMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().putIdToPlanMap(queryId, idToPlanMap);
-                } else {
-                    idToPlanMap.put(planId.asInt(), root);
                 }
+                idToPlanMap.put(planId.asInt(), root);
+                // fill plan to id map
+                Map<PhysicalPlan, Integer> planToIdMap = HistoryBasedPlanStatisticsManager.getInstance()
+                                .getHistoryBasedIdToPlanMapProvider().getPlanToIdMap(queryId);
                 if (planToIdMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().putPlanToIdMap(queryId, planToIdMap);
-                } else {
-                    planToIdMap.put(root, planId.asInt());
                 }
+                planToIdMap.put(root, planId.asInt());
             }
         }
     }
