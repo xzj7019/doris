@@ -23,6 +23,7 @@ import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.RuntimeProfile;
 import org.apache.doris.nereids.NereidsPlanner;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
+import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsUtil;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
@@ -394,11 +395,6 @@ public class Profile {
         return gson.toJson(rootProfile.toBrief());
     }
 
-    private String hashCanonicalPlan(String planString)
-    {
-        return sha256().hashString(planString, UTF_8).toString();
-    }
-
     public PlanStatistics getPlanStatistics(int nodeId, List<TPlanNodeRuntimeStatsItem> itemList) {
         for (TPlanNodeRuntimeStatsItem item : itemList) {
             if (item.node_id == nodeId) {
@@ -424,14 +420,14 @@ public class Profile {
 
     public void buildPlanNodeToInfoMap(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
             List<TPlanNodeRuntimeStatsItem> runtimeStatsItem,
-            Map<PhysicalPlan, PlanNodeCanonicalInfo> infos) {
+            Map<PhysicalPlan, PlanNodeCanonicalInfo> planToCanonicalInfoMap) {
         //List<Plan> children = root.children().stream().collect(Collectors.toList());
         Traverser<Plan> traverser = Traverser.forTree(Plan::children);
         for (Plan planNode : traverser.depthFirstPreOrder(root)) {
             if (planNode instanceof PhysicalOlapScan
                 || planNode instanceof AbstractPhysicalJoin) {
                 String canonicalPlanString = ((AbstractPhysicalPlan) planNode).hboTreeString();
-                String hashValue = hashCanonicalPlan(canonicalPlanString);
+                String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
                 ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
                 List<PhysicalOlapScan> scans = planNode.collectToList(PhysicalOlapScan.class::isInstance);
                 for (PhysicalOlapScan scan : scans) {
@@ -442,7 +438,7 @@ public class Profile {
                     }
                 }
                 PlanNodeCanonicalInfo info = new PlanNodeCanonicalInfo(hashValue, inputTableStatisticsBuilder.build());
-                infos.putIfAbsent((PhysicalPlan) planNode, info);
+                planToCanonicalInfoMap.putIfAbsent((PhysicalPlan) planNode, info);
             }
         }
     }
@@ -452,12 +448,10 @@ public class Profile {
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
         Map<PhysicalPlan, PlanNodeCanonicalInfo> planToInfoMap = new HashMap<>();
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
-
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
             int nodeId = nodeStats.node_id;
             PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
             PhysicalPlan planNode = idToPlanMap.get(nodeId);
-            // non-rfsafe node's plan stats info will NOT be collected and used in hbo stats calculating
             if (planNode != null) {
                 buildPlanNodeToInfoMap(planNode, planToIdMap, planNodeRuntimeStatsItems, planToInfoMap);
                 Optional<PlanNodeCanonicalInfo> planNodeCanonicalInfo = Optional.ofNullable(
@@ -485,13 +479,10 @@ public class Profile {
         HistoryBasedPlanStatisticsManager hboManager = HistoryBasedPlanStatisticsManager.getInstance();
         InMemoryHistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider = (InMemoryHistoryBasedPlanStatisticsProvider)
                 hboManager.getHistoryBasedPlanStatisticsProvider();
-
-        // get idToPlanMap
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
         Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
         Map<PhysicalPlan, Integer> planToIdMap = idToMapProvider.getPlanToIdMap(queryId);
-        // find the idToPlan entry
-        if (!idToPlanMap.isEmpty()) {
+        if (!idToPlanMap.isEmpty() && idToPlanMap.size() == planToIdMap.size()) {
             // get plan statistics
             Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(idToPlanMap,
                     planToIdMap, planNodeRuntimeStatsItems);
@@ -523,18 +514,16 @@ public class Profile {
         }
     }
 
-    public static HistoricalPlanStatistics updatePlanStatistics(
+    private HistoricalPlanStatistics updatePlanStatistics(
             HistoricalPlanStatistics historicalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
             PlanStatistics current)
     {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
-
         List<HistoricalPlanStatisticsEntry> newLastRunsStatistics = new ArrayList<>(lastRunsStatistics);
-        // update phase anyway to allow rf safe or not
-        // check it in the using phase
-        Optional<Integer> similarStatsIndex = getSimilarStatsIndex(historicalPlanStatistics,
-                inputTableStatistics, 0.1, 1.0);
+        // update phase anyway to allow rf safe or not, check it in the using phase
+        Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
+                historicalPlanStatistics, inputTableStatistics, 0.1, 1.0);
         if (similarStatsIndex.isPresent()) {
             newLastRunsStatistics.remove(similarStatsIndex.get().intValue());
         }
@@ -546,55 +535,6 @@ public class Profile {
         }
 
         return new HistoricalPlanStatistics(newLastRunsStatistics);
-    }
-
-    public static Optional<Integer> getSimilarStatsIndex(
-            HistoricalPlanStatistics historicalPlanStatistics,
-            List<PlanStatistics> inputTableStatistics,
-            double threshold, double hboRfSafeThreshold)
-    {
-        List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
-
-        if (lastRunsStatistics.isEmpty()) {
-            return Optional.empty();
-        }
-
-        for (int lastRunsIndex = 0; lastRunsIndex < lastRunsStatistics.size(); ++lastRunsIndex) {
-            if (inputTableStatistics.size() != lastRunsStatistics.get(lastRunsIndex).getInputTableStatistics().size()) {
-                // This is not expected, but may happen when changing thrift definitions.
-                continue;
-            }
-            boolean rowSimilarity = true;
-            //boolean outputSizeSimilarity = true;
-
-            // Match to historical stats only when size of input tables are similar to those of historical runs.
-            for (int inputTablesIndex = 0; rowSimilarity && inputTablesIndex < inputTableStatistics.size(); ++inputTablesIndex) {
-                PlanStatistics currentInputStatistics = inputTableStatistics.get(inputTablesIndex);
-                PlanStatistics historicalInputStatistics = lastRunsStatistics.get(lastRunsIndex).getInputTableStatistics().get(inputTablesIndex);
-                // check if rf safe
-                boolean isRFSafe = historicalInputStatistics.isRuntimeFilterSafeNode(hboRfSafeThreshold);
-                if (!isRFSafe) {
-                    rowSimilarity = false;
-                } else {
-                    rowSimilarity = rowSimilarity && similarStats(currentInputStatistics.getOutputRows(),
-                            historicalInputStatistics.getOutputRows(), threshold);
-                }
-                //outputSizeSimilarity = outputSizeSimilarity && similarStats(currentInputStatistics.getOutputSize().getValue(), historicalInputStatistics.getOutputSize().getValue(), threshold);
-            }
-            // Write information if both rows and output size are similar.
-            if (rowSimilarity/* && outputSizeSimilarity*/) {
-                return Optional.of(lastRunsIndex);
-            }
-        }
-        return Optional.empty();
-    }
-
-    public static boolean similarStats(double stats1, double stats2, double threshold)
-    {
-        if (isNaN(stats1) && isNaN(stats2)) {
-            return true;
-        }
-        return stats1 >= (1 - threshold) * stats2 && stats1 <= (1 + threshold) * stats2;
     }
 
     // Return if profile has been stored to storage
