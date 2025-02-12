@@ -38,6 +38,7 @@ import org.apache.doris.nereids.util.Utils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 
 import java.util.List;
 import java.util.Objects;
@@ -191,6 +192,14 @@ public class LogicalAggregate<CHILD_TYPE extends Plan>
                 "outputExpr", outputExpressions,
                 "hasRepeat", sourceRepeat.isPresent()
         );
+    }
+
+    @Override
+    public String toHboString() {
+        List<Object> args = Lists.newArrayList(
+                "groupByExpr", groupByExpressions,
+                "outputExpr", outputExpressions);
+        return Utils.toSqlString("Aggregate", args.toArray());
     }
 
     @Override

@@ -20,8 +20,10 @@ package org.apache.doris.nereids.stats;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.statistics.HistoricalPlanStatistics;
 import org.apache.doris.statistics.HistoricalPlanStatisticsEntry;
 import org.apache.doris.statistics.PlanStatistics;
@@ -87,10 +89,19 @@ public class HistoryBasedPlanStatisticsUtil {
     public static void collectScans(AbstractPlan planNode, List<LogicalOlapScan> scanList) {
         if (planNode instanceof LogicalOlapScan) {
             scanList.add((LogicalOlapScan) planNode);
-        } else if (planNode instanceof GroupPlan && ((GroupPlan) planNode).getGroup()
-                .getLogicalExpressions().get(0).getPlan() instanceof LogicalPlan) {
+        } else if (planNode instanceof GroupPlan
+                && !((GroupPlan) planNode).getGroup().getLogicalExpressions().isEmpty()
+                && ((GroupPlan) planNode).getGroup()
+                .getLogicalExpressions().get(0).getPlan() instanceof AbstractLogicalPlan) {
             Plan logicalPlan = ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan();
             collectScans((AbstractPlan) logicalPlan, scanList);
+        } else if (planNode instanceof GroupPlan
+                && ((GroupPlan) planNode).getGroup().getLogicalExpressions().isEmpty()
+                && !((GroupPlan) planNode).getGroup().getPhysicalExpressions().isEmpty()
+                && ((GroupPlan) planNode).getGroup()
+                .getPhysicalExpressions().get(0).getPlan() instanceof AbstractPhysicalPlan) {
+            Plan physicalPlan = ((GroupPlan) planNode).getGroup().getPhysicalExpressions().get(0).getPlan();
+            collectScans((AbstractPlan) physicalPlan, scanList);
         } else {
             for (Object child : planNode.children()) {
                 collectScans((AbstractPlan) child, scanList);

@@ -27,8 +27,10 @@ import org.apache.doris.nereids.trees.expressions.ExprId;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.StatementScopeIdGenerator;
 import org.apache.doris.nereids.trees.plans.TreeStringPlan.TreeStringNode;
+import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.util.MutableState;
 import org.apache.doris.nereids.util.TreeStringUtils;
 import org.apache.doris.statistics.Statistics;
@@ -129,12 +131,24 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
             return builder.toString();
         } else {
             for (Plan plan : children) {
-                if (plan instanceof GroupPlan && ((GroupPlan) plan).getGroup().getLogicalExpressions()
+                if (plan instanceof GroupPlan
+                        // FIXME: get 0 can not cover all cases
+                        && !((GroupPlan) plan).getGroup().getLogicalExpressions().isEmpty()
+                        && ((GroupPlan) plan).getGroup().getLogicalExpressions()
                         .get(0).getPlan() instanceof LogicalPlan) {
-                    LogicalPlan logicalPlan = (LogicalPlan) ((GroupPlan) plan).getGroup()
+                    AbstractLogicalPlan logicalPlan = (AbstractLogicalPlan) ((GroupPlan) plan).getGroup()
                             .getLogicalExpressions().get(0).getPlan();
-                    builder.append(((AbstractPlan) logicalPlan).hboTreeString());
-                } else if (plan instanceof LogicalPlan) {
+                    builder.append(logicalPlan.hboTreeString());
+                } else if (plan instanceof GroupPlan
+                        && ((GroupPlan) plan).getGroup().getLogicalExpressions().isEmpty()
+                        && !((GroupPlan) plan).getGroup().getPhysicalExpressions().isEmpty()
+                        // FIXME: get 0 can not cover all cases
+                        && ((GroupPlan) plan).getGroup().getPhysicalExpressions()
+                        .get(0).getPlan() instanceof AbstractPhysicalPlan) {
+                    AbstractPhysicalPlan physicalPlan = (AbstractPhysicalPlan) ((GroupPlan) plan).getGroup()
+                            .getPhysicalExpressions().get(0).getPlan();
+                    builder.append(physicalPlan.hboTreeString());
+                } else if (plan instanceof AbstractLogicalPlan) {
                     builder.append(((AbstractPlan) plan).hboTreeString());
                 } else if (plan instanceof AbstractPhysicalPlan) {
                     builder.append(((AbstractPlan) plan).hboTreeString());

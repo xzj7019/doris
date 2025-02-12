@@ -43,6 +43,7 @@ import org.apache.doris.statistics.Statistics;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 import java.util.List;
 import java.util.Objects;
@@ -209,6 +210,14 @@ public class PhysicalHashAggregate<CHILD_TYPE extends Plan> extends PhysicalUnar
                 "topnFilter", topnPushInfo != null,
                 "topnPushDown", getMutableState(MutableState.KEY_PUSH_TOPN_TO_AGG).isPresent()
         );
+    }
+
+    @Override
+    public String toHboString() {
+        List<Object> args = Lists.newArrayList(
+                "groupByExpr", groupByExpressions,
+                "outputExpr", outputExpressions);
+        return Utils.toSqlString("Aggregate", args.toArray());
     }
 
     /**
