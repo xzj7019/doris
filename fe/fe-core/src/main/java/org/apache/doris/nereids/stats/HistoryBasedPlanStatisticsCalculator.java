@@ -93,7 +93,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         HistoricalPlanStatistics planStatistics = historyBasedPlanStatisticsProvider.getHboStats(planNodeWithHash);
         Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(planNode, true);
         // TODO: get current inputTableStatistics
-        if (inputTableStatistics.isPresent()) {
+        if (inputTableStatistics.isPresent() && !planStatistics.getLastRunsStatistics().isEmpty()) {
             double hboRfsafeThreshold = -1.0;
             if (cascadesContext.getConnectContext() != null
                     && cascadesContext.getConnectContext().getSessionVariable() != null) {

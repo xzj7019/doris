@@ -71,6 +71,7 @@ public class RuntimeProfile {
                     .add("OLAP_SCAN_OPERATOR")
                     .add("AGGREGATION_OPERATOR")
                     .add("AGGREGATION_SINK_OPERATOR")
+                    .add("STREAMING_AGGREGATION_OPERATOR")
                     .add("HASH_JOIN_OPERATOR")
                     .add("HASH_JOIN_SINK_OPERATOR").build();
 
