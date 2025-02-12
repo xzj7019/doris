@@ -375,6 +375,8 @@ public abstract class Literal extends Expression implements LeafExpression, Comp
         return String.valueOf(getValue());
     }
 
+    public String toHboString() { return "?"; }
+
     public abstract LiteralExpr toLegacyLiteral();
 
     public boolean isStringLikeLiteral() {

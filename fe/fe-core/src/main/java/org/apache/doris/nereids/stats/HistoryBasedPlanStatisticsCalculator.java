@@ -20,13 +20,18 @@ package org.apache.doris.nereids.stats;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.trees.expressions.CTEId;
+import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
+import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.algebra.Aggregate;
 import org.apache.doris.nereids.trees.plans.algebra.Join;
 import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.planner.PlanNodeWithHash;
 import org.apache.doris.statistics.ColumnStatistic;
+import org.apache.doris.statistics.ColumnStatisticBuilder;
 import org.apache.doris.statistics.HistoricalPlanStatistics;
 import org.apache.doris.statistics.HistoricalPlanStatisticsEntry;
 import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
@@ -34,6 +39,7 @@ import org.apache.doris.statistics.PlanStatistics;
 import org.apache.doris.statistics.Statistics;
 import com.google.common.collect.ImmutableList;
 
+import com.google.common.collect.Maps;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
@@ -62,13 +68,17 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
 
     @Override
     protected Statistics computeJoin(Join join) {
-        Statistics legacyStats = JoinEstimation.estimate(
-                groupExpression.childStatistics(0),
-                groupExpression.childStatistics(1), join);
-        return getHistoricalStatistics((AbstractPlan) join, legacyStats);
+        Statistics legacyStats = super.computeJoin(join);
+        return getStatsFromHbo((AbstractPlan) join, legacyStats);
     }
 
-    private Statistics getHistoricalStatistics(AbstractPlan planNode, Statistics delegateStats) {
+    @Override
+    protected Statistics computeAggregate(Aggregate<? extends Plan> aggregate) {
+        Statistics legacyStats = super.computeAggregate(aggregate);
+        return getStatsFromHbo((AbstractPlan) aggregate, legacyStats);
+    }
+
+    private Statistics getStatsFromHbo(AbstractPlan planNode, Statistics delegateStats) {
         String hash;
         if (planNode instanceof AbstractPhysicalPlan) {
             hash = planNode.hboTreeString();

@@ -17,6 +17,7 @@
 
 package org.apache.doris.nereids.trees.expressions;
 
+import org.apache.doris.nereids.trees.expressions.literal.Literal;
 import org.apache.doris.nereids.trees.expressions.shape.BinaryExpression;
 import org.apache.doris.nereids.trees.expressions.typecoercion.ExpectsInputTypes;
 import org.apache.doris.nereids.types.DataType;
@@ -56,6 +57,18 @@ public abstract class BinaryOperator extends Expression implements BinaryExpress
     @Override
     public String toString() {
         return "(" + left().toString() + " " + symbol + " " + right().toString() + ")";
+    }
+
+    public String toHboString() {
+        String leftHboString = left().toString();
+        String rightHboString = right().toString();
+        if (left() instanceof Literal) {
+            leftHboString = ((Literal) left()).toHboString();
+        }
+        if (right() instanceof Literal) {
+            rightHboString = ((Literal) right()).toHboString();
+        }
+        return "(" + leftHboString + " " + symbol + " " + rightHboString + ")";
     }
 
     @Override

@@ -95,7 +95,7 @@ public class LogicalFilter<CHILD_TYPE extends Plan> extends LogicalUnary<CHILD_T
 
     @Override
     public String toHboString() {
-        return Utils.toSqlString("Filter[" + getGroupIdWithPrefix() + "]",
+        return Utils.toHboSqlString("Filter[" + getGroupIdWithPrefix() + "]",
                 "predicates", getPredicate()
         );
     }
