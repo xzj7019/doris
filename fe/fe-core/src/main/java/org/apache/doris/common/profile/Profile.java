@@ -33,6 +33,7 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalJoin;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalHashAggregate;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalRelation;
@@ -421,11 +422,11 @@ public class Profile {
     public void buildPlanNodeToInfoMap(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
             List<TPlanNodeRuntimeStatsItem> runtimeStatsItem,
             Map<PhysicalPlan, PlanNodeCanonicalInfo> planToCanonicalInfoMap) {
-        //List<Plan> children = root.children().stream().collect(Collectors.toList());
         Traverser<Plan> traverser = Traverser.forTree(Plan::children);
         for (Plan planNode : traverser.depthFirstPreOrder(root)) {
             if (planNode instanceof PhysicalOlapScan
-                || planNode instanceof AbstractPhysicalJoin) {
+                || planNode instanceof AbstractPhysicalJoin
+                || planNode instanceof PhysicalHashAggregate) {
                 String canonicalPlanString = ((AbstractPhysicalPlan) planNode).hboTreeString();
                 String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
                 ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();

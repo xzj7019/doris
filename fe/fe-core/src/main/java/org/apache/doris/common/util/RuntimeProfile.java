@@ -69,8 +69,8 @@ public class RuntimeProfile {
     public static final ImmutableSet<String> PLAN_NODE_TYPE_MAP =
             ImmutableSet.<String>builder()
                     .add("OLAP_SCAN_OPERATOR")
-                    //.add("AGGREGATION_OPERATOR")
-                    //.add("AGGREGATION_SINK_OPERATOR")
+                    .add("AGGREGATION_OPERATOR")
+                    .add("AGGREGATION_SINK_OPERATOR")
                     .add("HASH_JOIN_OPERATOR")
                     .add("HASH_JOIN_SINK_OPERATOR").build();
 
