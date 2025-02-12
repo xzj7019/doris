@@ -405,71 +405,44 @@ public class Profile {
         return PlanStatistics.EMPTY;
     }
 
-    public static void collectScans(AbstractPlan planNode, List<LogicalOlapScan> scanList) {
-        if (planNode instanceof LogicalOlapScan) {
-            scanList.add((LogicalOlapScan) planNode);
-        } else if (planNode instanceof GroupPlan
-                && ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan() instanceof LogicalPlan) {
-            Plan logicalPlan = ((GroupPlan) planNode).getGroup().getLogicalExpressions().get(0).getPlan();
-            collectScans((AbstractPlan) logicalPlan, scanList);
-        } else {
-            for (Object child : planNode.children()) {
-                collectScans((AbstractPlan) child, scanList);
+    public PlanNodeCanonicalInfo buildPlanNodeCanonicalInfo(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
+            List<TPlanNodeRuntimeStatsItem> runtimeStatsItem) {
+        String canonicalPlanString = ((AbstractPhysicalPlan) root).hboTreeString();
+        String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
+        ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
+        List<PhysicalOlapScan> scans = root.collectToList(PhysicalOlapScan.class::isInstance);
+        for (PhysicalOlapScan scan : scans) {
+            int nodeId = planToIdMap.get(scan);
+            PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem);
+            if (!planStatistics.equals(PlanStatistics.EMPTY)) {
+                inputTableStatisticsBuilder.add(planStatistics);
             }
         }
+        return new PlanNodeCanonicalInfo(hashValue, inputTableStatisticsBuilder.build());
     }
 
-    public void buildPlanNodeToInfoMap(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
-            List<TPlanNodeRuntimeStatsItem> runtimeStatsItem,
-            Map<PhysicalPlan, PlanNodeCanonicalInfo> planToCanonicalInfoMap) {
-        Traverser<Plan> traverser = Traverser.forTree(Plan::children);
-        for (Plan planNode : traverser.depthFirstPreOrder(root)) {
-            if (planNode instanceof PhysicalOlapScan
-                || planNode instanceof AbstractPhysicalJoin
-                || planNode instanceof PhysicalHashAggregate) {
-                String canonicalPlanString = ((AbstractPhysicalPlan) planNode).hboTreeString();
-                String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
-                ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
-                List<PhysicalOlapScan> scans = planNode.collectToList(PhysicalOlapScan.class::isInstance);
-                for (PhysicalOlapScan scan : scans) {
-                    int nodeId = planToIdMap.get(scan);
-                    PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem);
-                    if (!planStatistics.equals(PlanStatistics.EMPTY)) {
-                        inputTableStatisticsBuilder.add(planStatistics);
-                    }
-                }
-                PlanNodeCanonicalInfo info = new PlanNodeCanonicalInfo(hashValue, inputTableStatisticsBuilder.build());
-                planToCanonicalInfoMap.putIfAbsent((PhysicalPlan) planNode, info);
-            }
-        }
-    }
-
-    public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> getQueryStats(
+    public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> generatePlanStatisticsMap(
             Map<Integer, PhysicalPlan> idToPlanMap, Map<PhysicalPlan, Integer> planToIdMap,
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
-        Map<PhysicalPlan, PlanNodeCanonicalInfo> planToInfoMap = new HashMap<>();
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
             int nodeId = nodeStats.node_id;
             PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
             PhysicalPlan planNode = idToPlanMap.get(nodeId);
             if (planNode != null) {
-                buildPlanNodeToInfoMap(planNode, planToIdMap, planNodeRuntimeStatsItems, planToInfoMap);
-                Optional<PlanNodeCanonicalInfo> planNodeCanonicalInfo = Optional.ofNullable(
-                        planToInfoMap.get(planNode));
-                if (planNodeCanonicalInfo.isPresent()) {
-                    String hash = planNodeCanonicalInfo.get().getHash();
-                    PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash((AbstractPlan) planNode,
-                            Optional.of(hash));
-                    List<PlanStatistics> inputTableStatistics = planNodeCanonicalInfo.get()
-                            .getInputTableStatistics();
-                    HistoryBasedSourceInfo sourceInfo = new HistoryBasedSourceInfo(Optional.of(hash),
-                            Optional.of(inputTableStatistics));
-                    PlanStatisticsWithSourceInfo planStatsWithSourceInfo = new PlanStatisticsWithSourceInfo(
-                            nodeId, planStatistics, sourceInfo);
+                PlanNodeCanonicalInfo planNodeCanonicalInfo = buildPlanNodeCanonicalInfo(
+                        planNode, planToIdMap, planNodeRuntimeStatsItems);
+                String hash = planNodeCanonicalInfo.getHash();
+                PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash((AbstractPlan) planNode,
+                        Optional.of(hash));
+                List<PlanStatistics> inputTableStatistics = planNodeCanonicalInfo
+                        .getInputTableStatistics();
+                HistoryBasedSourceInfo sourceInfo = new HistoryBasedSourceInfo(Optional.of(hash),
+                        Optional.of(inputTableStatistics));
+                PlanStatisticsWithSourceInfo planStatsWithSourceInfo = new PlanStatisticsWithSourceInfo(
+                        nodeId, planStatistics, sourceInfo);
 
-                    planStatisticsMap.put(planNodeWithHash, planStatsWithSourceInfo);
-                }
+                planStatisticsMap.put(planNodeWithHash, planStatsWithSourceInfo);
             }
         }
         return ImmutableMap.copyOf(planStatisticsMap);
@@ -485,7 +458,7 @@ public class Profile {
         Map<PhysicalPlan, Integer> planToIdMap = idToMapProvider.getPlanToIdMap(queryId);
         if (!idToPlanMap.isEmpty() && idToPlanMap.size() == planToIdMap.size()) {
             // get plan statistics
-            Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = getQueryStats(idToPlanMap,
+            Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = generatePlanStatisticsMap(idToPlanMap,
                     planToIdMap, planNodeRuntimeStatsItems);
             Map<PlanNodeWithHash, HistoricalPlanStatistics> historicalPlanStatisticsMap =
                     historyBasedPlanStatisticsProvider.getHboStats(
