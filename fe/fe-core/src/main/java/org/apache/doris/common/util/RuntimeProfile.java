@@ -841,14 +841,24 @@ public class RuntimeProfile {
                         item.setInputRows(value.sum.getValue());
                         if (isBuildSinkOperator) {
                             item.setJoinBuilderRows(value.sum.getValue());
-                            long avgBuildValue = value.sum.getValue() / value.number;
-                            item.setJoinBuilderSkewRatio((int) (value.max.getValue() / avgBuildValue));
+                            if (value.sum.getValue() == 0) {
+                                // builder side may be empty, set 1 directly for passing skew checking
+                                item.setJoinBuilderSkewRatio(1);
+                            } else {
+                                long avgBuildValue = value.sum.getValue() / value.number;
+                                item.setJoinBuilderSkewRatio((int) (value.max.getValue() / avgBuildValue));
+                            }
                         }
                         break;
                     case "ProbeRows":
                         item.setJoinProbeRows(value.sum.getValue());
-                        long avgProbeValue = value.sum.getValue() / value.number;
-                        item.setJoinProberSkewRatio((int) (value.max.getValue() / avgProbeValue));
+                        if (value.sum.getValue() == 0) {
+                            // probe side may be empty, set 1 directly for passing skew checking
+                            item.setJoinProberSkewRatio(1);
+                        } else {
+                            long avgProbeValue = value.sum.getValue() / value.number;
+                            item.setJoinProberSkewRatio((int) (value.max.getValue() / avgProbeValue));
+                        }
                         break;
                 }
             }
