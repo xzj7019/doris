@@ -126,6 +126,9 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
             if (historicalPlanStatistics.equals(historicalPlanStatistics.empty())) {
                 return Optional.empty();
             } else {
+                // TODO: first match checking based on accurate partition info
+                // otherwise, use the entry 0 since the param number has been considered in plan hash
+                // note: next round, the accurate matching entry will be added into and will be matched next time (TODO: testing)
                 PlanStatistics planStatistics = historicalPlanStatistics.getLastRunsStatistics()
                         .get(0).getPlanStatistics();
                 inputTableStatisticsBuilder.add(planStatistics);

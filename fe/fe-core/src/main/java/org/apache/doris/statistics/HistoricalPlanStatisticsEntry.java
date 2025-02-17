@@ -67,7 +67,7 @@ public class HistoricalPlanStatisticsEntry
     @Override
     public String toString()
     {
-        return String.format("HistoricalPlanStatisticsEntry{planStatistics=%s, inputTableStatistics=%s,"
-                + "historicalPlanStatisticsEntryInfo=%s}", planStatistics, inputTableStatistics);
+        return String.format("HistoricalPlanStatisticsEntry{planStatistics=%s, inputTableStatistics=%s}",
+                planStatistics, inputTableStatistics);
     }
 }

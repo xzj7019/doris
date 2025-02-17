@@ -59,6 +59,7 @@ public abstract class BinaryOperator extends Expression implements BinaryExpress
         return "(" + left().toString() + " " + symbol + " " + right().toString() + ")";
     }
 
+    @Override
     public String toHboString() {
         String leftHboString = left().toString();
         String rightHboString = right().toString();

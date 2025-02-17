@@ -189,37 +189,8 @@ public class Utils {
         return stringBuilder.append(" )").toString();
     }
 
-    public static String toHboSqlString(String planName, Object... variables) {
-        Preconditions.checkState(variables.length % 2 == 0);
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(planName).append(" ( ");
-
-        if (variables.length == 0) {
-            return stringBuilder.append(" )").toString();
-        }
-
-        for (int i = 0; i < variables.length - 1; i += 2) {
-            if (!"".equals(toHboStringOrNull(variables[i + 1]))) {
-                if (i != 0) {
-                    stringBuilder.append(", ");
-                }
-                stringBuilder.append(toHboStringOrNull(variables[i])).append("=").append(toHboStringOrNull(variables[i + 1]));
-            }
-        }
-
-        return stringBuilder.append(" )").toString();
-    }
-
     private static String toStringOrNull(Object obj) {
         return obj == null ? "null" : obj.toString();
-    }
-
-    private static String toHboStringOrNull(Object obj) {
-        if (obj instanceof BinaryOperator) {
-            return obj == null ? "null" : ((BinaryOperator) obj).toHboString();
-        } else {
-            return obj == null ? "null" : obj.toString();
-        }
     }
 
     /**

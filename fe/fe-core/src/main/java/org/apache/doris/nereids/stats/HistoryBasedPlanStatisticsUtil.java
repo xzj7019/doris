@@ -122,7 +122,7 @@ public class HistoryBasedPlanStatisticsUtil {
         if (lastRunsStatistics.isEmpty()) {
             return Optional.empty();
         }
-
+        // TODO: add accurate partition info matching logic in getSimilarStatsIndex
         Optional<Integer> similarStatsIndex = getSimilarStatsIndex(historicalPlanStatistics,
                 inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
 

@@ -489,7 +489,7 @@ public class Profile {
     }
 
     private HistoricalPlanStatistics updatePlanStatistics(
-            HistoricalPlanStatistics historicalPlanStatistics,
+            HistoricalPlanStatistics historicalPlanStatistics, // means old entries
             List<PlanStatistics> inputTableStatistics,
             PlanStatistics current)
     {
