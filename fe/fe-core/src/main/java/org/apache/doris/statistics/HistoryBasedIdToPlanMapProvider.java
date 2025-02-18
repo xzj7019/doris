@@ -3,6 +3,7 @@ package org.apache.doris.statistics;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.ConfigBase.DefaultConfHandler;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
+import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -11,11 +12,13 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class HistoryBasedIdToPlanMapProvider {
     private volatile Cache<String, Map<Integer, PhysicalPlan>> idToPlanCache;
     private volatile Cache<String, Map<PhysicalPlan, Integer>> planToIdCache;
+    private volatile Cache<String, Map<PhysicalPlan, Set<Expression>>> tableToFilterCache;
     public HistoryBasedIdToPlanMapProvider() {
         idToPlanCache = buildHboIdToPlanCache(
                 Config.hbo_cache_manage_num,
@@ -25,6 +28,25 @@ public class HistoryBasedIdToPlanMapProvider {
                 Config.hbo_cache_manage_num,
                 Config.expire_hbo_cache_in_fe_second
         );
+        tableToFilterCache = buildHboTableToFilterCache(
+                Config.hbo_cache_manage_num,
+                Config.expire_hbo_cache_in_fe_second
+        );
+    }
+
+    private static Cache<String, Map<PhysicalPlan, Set<Expression>>> buildHboTableToFilterCache(int hboCacheNum,
+            long expireAfterAccessSeconds) {
+        Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder()
+                // auto evict cache when jvm memory too low
+                .softValues();
+        if (hboCacheNum > 0) {
+            cacheBuilder.maximumSize(hboCacheNum);
+        }
+        if (expireAfterAccessSeconds > 0) {
+            cacheBuilder = cacheBuilder.expireAfterAccess(Duration.ofSeconds(expireAfterAccessSeconds));
+        }
+
+        return cacheBuilder.build();
     }
 
     private static Cache<String, Map<Integer, PhysicalPlan>> buildHboIdToPlanCache(int hboCacheNum,
@@ -74,6 +96,14 @@ public class HistoryBasedIdToPlanMapProvider {
         planToIdCache.put(queryId, idToPlanMap);
     }
 
+    public Map<PhysicalPlan, Set<Expression>> getTableToExprMap(String queryId) {
+        return tableToFilterCache.asMap().getOrDefault(queryId, new ConcurrentHashMap<>());
+    }
+
+    public void putTableToExprMap(String queryId, Map<PhysicalPlan, Set<Expression>> tableToExprMap) {
+        tableToFilterCache.put(queryId, tableToExprMap);
+    }
+
     public static class UpdateConfig extends DefaultConfHandler {
         @Override
         public void handle(Field field, String confVal) throws Exception {
@@ -100,9 +130,15 @@ public class HistoryBasedIdToPlanMapProvider {
                 Config.hbo_cache_manage_num,
                 Config.expire_hbo_cache_in_fe_second
         );
+        Cache<String, Map<PhysicalPlan, Set<Expression>>> tableToExprCache = buildHboTableToFilterCache(
+                Config.hbo_cache_manage_num,
+                Config.expire_hbo_cache_in_fe_second
+        );
         idToPlanCache.putAll(hboIdToPlanProvider.idToPlanCache.asMap());
         hboIdToPlanProvider.idToPlanCache = idToPlanCache;
         planToIdCache.putAll(hboIdToPlanProvider.planToIdCache.asMap());
         hboIdToPlanProvider.planToIdCache = planToIdCache;
+        tableToExprCache.putAll(hboIdToPlanProvider.tableToFilterCache.asMap());
+        hboIdToPlanProvider.tableToFilterCache = tableToExprCache;
     }
 }

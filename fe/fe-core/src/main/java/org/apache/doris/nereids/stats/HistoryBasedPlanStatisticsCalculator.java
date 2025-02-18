@@ -95,13 +95,15 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         // TODO: get current inputTableStatistics
         if (inputTableStatistics.isPresent() && !planStatistics.getLastRunsStatistics().isEmpty()) {
             double hboRfsafeThreshold = -1.0;
+            double rowCountMatchingThreshold = 0.1;
             if (cascadesContext.getConnectContext() != null
                     && cascadesContext.getConnectContext().getSessionVariable() != null) {
                 hboRfsafeThreshold = cascadesContext.getConnectContext().getSessionVariable().getHboRfSafeThreshold();
+                rowCountMatchingThreshold = cascadesContext.getConnectContext().getSessionVariable().getHboRowMatchingThreshold();
             }
             Optional<HistoricalPlanStatisticsEntry> historicalPlanStatisticsEntry
                     = HistoryBasedPlanStatisticsUtil.getSelectedHistoricalPlanStatisticsEntry
-                    (planStatistics, inputTableStatistics.get(), 0.1, hboRfsafeThreshold);
+                    (planStatistics, inputTableStatistics.get(), rowCountMatchingThreshold, hboRfsafeThreshold);
             if (historicalPlanStatisticsEntry.isPresent()) {
                 PlanStatistics predictedPlanStatistics = historicalPlanStatisticsEntry.get().getPlanStatistics();
                 // todo: choose which one is the output rows count

@@ -27,6 +27,7 @@ import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.statistics.HistoricalPlanStatistics;
 import org.apache.doris.statistics.HistoricalPlanStatisticsEntry;
 import org.apache.doris.statistics.PlanStatistics;
+import org.apache.doris.statistics.TablePlanStatistics;
 
 import static com.google.common.hash.Hashing.sha256;
 import static java.lang.Double.isNaN;
@@ -37,13 +38,75 @@ import java.util.Optional;
 
 public class HistoryBasedPlanStatisticsUtil {
 
+    public static Optional<Integer> getAccurateStatsIndex(
+            HistoricalPlanStatistics historicalPlanStatistics,
+            List<PlanStatistics> inputTableStatistics,
+            double rowThreshold,
+            double hboRfSafeThreshold,
+            boolean onlyMatchPartition)
+    {
+        List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
+        if (lastRunsStatistics.isEmpty()) {
+            return Optional.empty();
+        }
+
+        for (int lastRunsIndex = 0; lastRunsIndex < lastRunsStatistics.size(); ++lastRunsIndex) {
+            if (inputTableStatistics.size() != lastRunsStatistics.get(lastRunsIndex).getInputTableStatistics().size()) {
+                continue;
+            }
+            boolean accurateMatch = true;
+            for (int inputTablesIndex = 0; accurateMatch && inputTablesIndex < inputTableStatistics.size(); ++inputTablesIndex) {
+                TablePlanStatistics currentInputStatistics = (TablePlanStatistics) inputTableStatistics.get(inputTablesIndex);
+                TablePlanStatistics historicalInputStatistics = (TablePlanStatistics)  lastRunsStatistics.get(lastRunsIndex)
+                        .getInputTableStatistics().get(inputTablesIndex);
+                // check if rf safe
+                boolean isRFSafe = historicalInputStatistics.isRuntimeFilterSafeNode(hboRfSafeThreshold);
+                if (!isRFSafe) {
+                    accurateMatch = false;
+                } else {
+                    // find the first full matching entry in lastRunEntries
+                    accurateMatch = accurateMatch(currentInputStatistics, historicalInputStatistics, rowThreshold, onlyMatchPartition);
+                }
+            }
+            if (accurateMatch) {
+                return Optional.of(lastRunsIndex);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public static boolean accurateMatch(TablePlanStatistics currentInputStatistics,
+            TablePlanStatistics historicalInputStatistics, double rowThreshold, boolean onlyMatchingPartition) {
+        if (currentInputStatistics.isPartitionedTable() && historicalInputStatistics.isPartitionedTable()) {
+            // for partition table, must ensure the pruned partition is the same
+            // and the other predicate with the constant is the same
+            boolean hasSamePartition = currentInputStatistics.hasSamePartitionId(historicalInputStatistics);
+            boolean hasSameOtherPredicate = currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
+            // if onlyMatchingPartition is true, the matching condition will be
+            // 1. the pruned partition ids are the same
+            // 2. the row count threshold is in the threshold
+            if (onlyMatchingPartition) {
+                return hasSamePartition && similarStats(currentInputStatistics.getOutputRows(),
+                        historicalInputStatistics.getOutputRows(), rowThreshold);
+            } else {
+                // if all predicates are the same, just return the accurate entry's index
+                return hasSamePartition && hasSameOtherPredicate;
+            }
+        } else if (!currentInputStatistics.isPartitionedTable() && !historicalInputStatistics.isPartitionedTable()) {
+            // for non-partition table, must ensure the other predicate with the constant is the same
+            boolean hasSameOtherPredicate = currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
+            return hasSameOtherPredicate;
+        } else {
+            throw new RuntimeException("unexpected state during hbo input table stats matching");
+        }
+    }
+
     public static Optional<Integer> getSimilarStatsIndex(
             HistoricalPlanStatistics historicalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
-            double threshold, double hboRfSafeThreshold)
+            double rowThreshold, double hboRfSafeThreshold)
     {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
-
         if (lastRunsStatistics.isEmpty()) {
             return Optional.empty();
         }
@@ -65,10 +128,12 @@ public class HistoryBasedPlanStatisticsUtil {
                 if (!isRFSafe) {
                     rowSimilarity = false;
                 } else {
-                    rowSimilarity = rowSimilarity && similarStats(currentInputStatistics.getOutputRows(),
-                            historicalInputStatistics.getOutputRows(), threshold);
+                    rowSimilarity = similarStats(currentInputStatistics.getOutputRows(),
+                            historicalInputStatistics.getOutputRows(), rowThreshold);
                 }
-                //outputSizeSimilarity = outputSizeSimilarity && similarStats(currentInputStatistics.getOutputSize().getValue(), historicalInputStatistics.getOutputSize().getValue(), threshold);
+                //outputSizeSimilarity = outputSizeSimilarity
+                // && similarStats(currentInputStatistics.getOutputSize().getValue(),
+                // historicalInputStatistics.getOutputSize().getValue(), threshold);
             }
             // Write information if both rows and output size are similar.
             if (rowSimilarity/* && outputSizeSimilarity*/) {
@@ -114,22 +179,36 @@ public class HistoryBasedPlanStatisticsUtil {
     }
 
     public static Optional<HistoricalPlanStatisticsEntry> getSelectedHistoricalPlanStatisticsEntry(
-            HistoricalPlanStatistics historicalPlanStatistics,
+            HistoricalPlanStatistics oldHistoricalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
             double historyMatchingThreshold,
             double hboRfSafeThreshold) {
-        List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
+        List<HistoricalPlanStatisticsEntry> lastRunsStatistics = oldHistoricalPlanStatistics.getLastRunsStatistics();
         if (lastRunsStatistics.isEmpty()) {
             return Optional.empty();
         }
-        // TODO: add accurate partition info matching logic in getSimilarStatsIndex
-        Optional<Integer> similarStatsIndex = getSimilarStatsIndex(historicalPlanStatistics,
-                inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
 
+        // firstly full matching, i.e, the same partition ids,
+        //                             the same other predicate with the same constant
+        // it is mainly for accurate matching under RETRY
+        // by design, the accurate entry in the lastRunEntries will have only ONE entry
+        Optional<Integer> accurateStatsIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold, false);
+        if (accurateStatsIndex.isPresent()) {
+            return Optional.of(lastRunsStatistics.get(accurateStatsIndex.get()));
+        }
+
+        Optional<Integer> accurateStatsOnlyMatchPartitionIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold, true);
+        if (accurateStatsOnlyMatchPartitionIndex.isPresent()) {
+            return Optional.of(lastRunsStatistics.get(accurateStatsOnlyMatchPartitionIndex.get()));
+        }
+
+        Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
+                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
         if (similarStatsIndex.isPresent()) {
             return Optional.of(lastRunsStatistics.get(similarStatsIndex.get()));
         }
-
         // TODO: Use linear regression to predict stats if we have only 1 table.
         return Optional.empty();
     }

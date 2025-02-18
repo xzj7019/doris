@@ -29,7 +29,6 @@ public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
     private static volatile HistoryBasedPlanStatisticsManager INSTANCE = null;
     //private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
     private HistoryBasedPlanStatisticsProvider historyBasedPlanStatisticsProvider;
-
     private HistoryBasedIdToPlanMapProvider historyBasedIdToPlanMapProvider;
     private final ExecutorService hboExecutor;
 
@@ -44,6 +43,8 @@ public class HistoryBasedPlanStatisticsManager extends MasterDaemon {
     }
 
     public static HistoryBasedPlanStatisticsManager getInstance() {
+        // TODO: should with current session and configuration info and will be used in runtime stats collection
+        // and plan matching during stats calculator
         if (INSTANCE == null) {
             synchronized (HistoryBasedPlanStatisticsManager.class) {
                 if (INSTANCE == null) {

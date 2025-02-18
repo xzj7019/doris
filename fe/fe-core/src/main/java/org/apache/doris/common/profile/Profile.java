@@ -17,6 +17,7 @@
 
 package org.apache.doris.common.profile;
 
+import org.apache.doris.catalog.PartitionInfo;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.io.Text;
 import org.apache.doris.common.util.DebugUtil;
@@ -24,6 +25,7 @@ import org.apache.doris.common.util.RuntimeProfile;
 import org.apache.doris.nereids.NereidsPlanner;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsUtil;
+import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
@@ -65,6 +67,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
@@ -80,6 +83,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
@@ -396,16 +400,20 @@ public class Profile {
         return gson.toJson(rootProfile.toBrief());
     }
 
-    public PlanStatistics getPlanStatistics(int nodeId, List<TPlanNodeRuntimeStatsItem> itemList) {
+    public PlanStatistics getPlanStatistics(int nodeId, List<TPlanNodeRuntimeStatsItem> itemList,
+            boolean isTablePlanStatistics, boolean isPartitionedTable, Set<Expression> tableFilterSet, PartitionInfo partitionInfo,
+            List<Long> selectedPartitionIds) {
         for (TPlanNodeRuntimeStatsItem item : itemList) {
             if (item.node_id == nodeId) {
-                return PlanStatistics.buildFromStatsItem(item);
+                return PlanStatistics.buildFromStatsItem(item, isTablePlanStatistics, isPartitionedTable, tableFilterSet, partitionInfo,
+                        selectedPartitionIds);
             }
         }
         return PlanStatistics.EMPTY;
     }
 
     public PlanNodeCanonicalInfo buildPlanNodeCanonicalInfo(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
+            Map<PhysicalPlan, Set<Expression>> tableToExprMap,
             List<TPlanNodeRuntimeStatsItem> runtimeStatsItem) {
         String canonicalPlanString = ((AbstractPhysicalPlan) root).hboTreeString();
         String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
@@ -413,7 +421,10 @@ public class Profile {
         List<PhysicalOlapScan> scans = root.collectToList(PhysicalOlapScan.class::isInstance);
         for (PhysicalOlapScan scan : scans) {
             int nodeId = planToIdMap.get(scan);
-            PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem);
+            // TODO: optimize the search logic to make a map to speed up the searching from runtimeStatsItem
+            PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem, true,
+                    scan.getTable().isPartitionedTable(),
+                    tableToExprMap.get(scan), scan.getTable().getPartitionInfo(), scan.getSelectedPartitionIds());
             if (!planStatistics.equals(PlanStatistics.EMPTY)) {
                 inputTableStatisticsBuilder.add(planStatistics);
             }
@@ -423,15 +434,30 @@ public class Profile {
 
     public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> generatePlanStatisticsMap(
             Map<Integer, PhysicalPlan> idToPlanMap, Map<PhysicalPlan, Integer> planToIdMap,
+            Map<PhysicalPlan, Set<Expression>> tableToExprMap,
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
             int nodeId = nodeStats.node_id;
-            PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats);
             PhysicalPlan planNode = idToPlanMap.get(nodeId);
+            Set<Expression> tableFilterSet = null;
+            PartitionInfo partitionInfo = null;
+            boolean isOlapScan = false;
+            boolean isPartitionedTable = false;
+            if (planNode instanceof PhysicalOlapScan) {
+                if (tableToExprMap.get(planNode) != null) {
+                    tableFilterSet = tableToExprMap.get(planNode);
+                    partitionInfo = ((PhysicalOlapScan) planNode).getTable().getPartitionInfo();
+                }
+                isOlapScan = true;
+                isPartitionedTable = ((PhysicalOlapScan) planNode).getTable().isPartitionedTable();
+            }
+            PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats,
+                    isOlapScan, isPartitionedTable, tableFilterSet, partitionInfo,
+                    isOlapScan ? ((PhysicalOlapScan) planNode).getSelectedPartitionIds() : ImmutableList.of());
             if (planNode != null) {
                 PlanNodeCanonicalInfo planNodeCanonicalInfo = buildPlanNodeCanonicalInfo(
-                        planNode, planToIdMap, planNodeRuntimeStatsItems);
+                        planNode, planToIdMap, tableToExprMap, planNodeRuntimeStatsItems);
                 String hash = planNodeCanonicalInfo.getHash();
                 PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash((AbstractPlan) planNode,
                         Optional.of(hash));
@@ -456,10 +482,11 @@ public class Profile {
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
         Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
         Map<PhysicalPlan, Integer> planToIdMap = idToMapProvider.getPlanToIdMap(queryId);
+        Map<PhysicalPlan, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
         if (!idToPlanMap.isEmpty() && idToPlanMap.size() == planToIdMap.size()) {
             // get plan statistics
             Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = generatePlanStatisticsMap(idToPlanMap,
-                    planToIdMap, planNodeRuntimeStatsItems);
+                    planToIdMap, tableToExprMap, planNodeRuntimeStatsItems);
             Map<PlanNodeWithHash, HistoricalPlanStatistics> historicalPlanStatisticsMap =
                     historyBasedPlanStatisticsProvider.getHboStats(
                             planStatistics.keySet().stream().collect(toImmutableList()));
@@ -475,13 +502,15 @@ public class Profile {
                                                 historicalPlanStatisticsMap.get(entry.getKey()))
                                         .orElseGet(HistoricalPlanStatistics::empty);
                                 HistoryBasedSourceInfo historyBasedSourceInfo = entry.getValue().getSourceInfo();
+                                // NOTE: find the most matching entry to do the replacement
+                                // especially for retry handling
                                 return updatePlanStatistics(
                                         oldPlanStatistics,
                                         historyBasedSourceInfo.getInputTableStatistics().get(),
                                         entry.getValue().getPlanStatistics());
                             }));
 
-            // publish stats and refresh cache
+            // publish stats and refresh cache on current matching key hashing
             if (!newPlanStatistics.isEmpty()) {
                 historyBasedPlanStatisticsProvider.putHboStats(ImmutableMap.copyOf(newPlanStatistics));
             }
@@ -489,22 +518,50 @@ public class Profile {
     }
 
     private HistoricalPlanStatistics updatePlanStatistics(
-            HistoricalPlanStatistics historicalPlanStatistics, // means old entries
-            List<PlanStatistics> inputTableStatistics,
-            PlanStatistics current)
+            HistoricalPlanStatistics oldHistoricalPlanStatistics,
+            List<PlanStatistics> newInputTableStatistics,
+            PlanStatistics newPlanStatistics)
     {
-        List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
+        List<HistoricalPlanStatisticsEntry> lastRunsStatistics = oldHistoricalPlanStatistics.getLastRunsStatistics();
         List<HistoricalPlanStatisticsEntry> newLastRunsStatistics = new ArrayList<>(lastRunsStatistics);
-        // update phase anyway to allow rf safe or not, check it in the using phase
-        Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
-                historicalPlanStatistics, inputTableStatistics, 0.1, 1.0);
-        if (similarStatsIndex.isPresent()) {
-            newLastRunsStatistics.remove(similarStatsIndex.get().intValue());
+        // firstly full matching, i.e, the same partition ids,
+        //                             the same other predicate with the same constant
+        // it is mainly for accurate matching under RETRY
+        // by design, the accurate entry in the lastRunEntries will have only ONE entry
+        Optional<Integer> accurateStatsIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0, false);
+        if (accurateStatsIndex.isPresent()) {
+            newLastRunsStatistics.remove(accurateStatsIndex.get().intValue());
+        } else {
+            // secondly partial matching, i.e, the same partition ids,
+            //                                 but other predicate with the different constant or else
+            // the returned entry will have the same partition ids restriction and the row count threshold protection
+            Optional<Integer> accurateStatsOnlyMatchPartitionIndex
+                    = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                    oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0, true);
+            if (accurateStatsOnlyMatchPartitionIndex.isPresent()) {
+                newLastRunsStatistics.remove(accurateStatsOnlyMatchPartitionIndex.get().intValue());
+            } else {
+                // if full matching can't be found, try to find the similar entry
+                // similar matching, i.e, the same partition number(key hashing has ensured this point)
+                //                        the same other predicate pattern but with the different constant
+                // it is mainly for the regular hbo info matching
+                // by design, this part of similar entries will have multiple entries, which corresponding
+                // different constant parameter with the different cards. input info.
+                // this matching return value must have a threshold protection, which NOT over a value such as 0.1
+                Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
+                        oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0);
+                if (similarStatsIndex.isPresent()) {
+                    newLastRunsStatistics.remove(similarStatsIndex.get().intValue());
+                }
+            }
         }
-
-        newLastRunsStatistics.add(new HistoricalPlanStatisticsEntry(current, inputTableStatistics));
-        int maxLastRuns = inputTableStatistics.isEmpty() ? 1 : 10;//config.getMaxLastRunsHistory();
+        // the newListRunsStatistics list performs likes a fifo way
+        newLastRunsStatistics.add(new HistoricalPlanStatisticsEntry(newPlanStatistics, newInputTableStatistics));
+        // TODO: config.getMaxLastRunsHistory();
+        int maxLastRuns = newInputTableStatistics.isEmpty() ? 1 : 10;
         if (newLastRunsStatistics.size() > maxLastRuns) {
+            // this fifo list if it is over the threshold, the first entry 0 will be removed
             newLastRunsStatistics.remove(0);
         }
 

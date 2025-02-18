@@ -50,6 +50,7 @@ import org.apache.doris.nereids.properties.PhysicalProperties;
 import org.apache.doris.nereids.rules.exploration.mv.MaterializationContext;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.nereids.stats.StatsCalculator;
+import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
@@ -64,6 +65,8 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalCatalogRelation;
 import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalSqlCache;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalFilter;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalRelation;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalSqlCache;
@@ -94,6 +97,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -458,6 +462,17 @@ public class NereidsPlanner extends Planner {
                             .getHistoryBasedIdToPlanMapProvider().putPlanToIdMap(queryId, planToIdMap);
                 }
                 planToIdMap.put(root, planId.asInt());
+            }
+            // fill table to expr map
+            if (root instanceof PhysicalFilter && root.children().get(0) instanceof PhysicalOlapScan) {
+                PhysicalOlapScan tableScan = (PhysicalOlapScan) root.children().get(0);
+                Map<PhysicalPlan, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
+                        .getHistoryBasedIdToPlanMapProvider().getTableToExprMap(queryId);
+                if (tableToFilterExprMap.isEmpty()) {
+                    HistoryBasedPlanStatisticsManager.getInstance()
+                            .getHistoryBasedIdToPlanMapProvider().putTableToExprMap(queryId, tableToFilterExprMap);
+                }
+                tableToFilterExprMap.put(tableScan, ((PhysicalFilter) root).getConjuncts());
             }
         }
     }

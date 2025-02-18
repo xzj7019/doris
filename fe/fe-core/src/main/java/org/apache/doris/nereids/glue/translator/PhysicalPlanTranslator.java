@@ -1274,6 +1274,9 @@ public class PhysicalPlanTranslator extends DefaultPlanVisitor<PlanFragment, Pla
                         || planNode.hasLimit()) {
                     planNode = new SelectNode(context.nextPlanNodeId(), planNode);
                     planNode.setNereidsId(filter.getId());
+                    // NOTE: can't collect planNode.getId() on filter's child, such as scan node
+                    // since if the filter is embedded into scan, the id mapping relation is not correct
+                    // i.e, the physical filter's nereids's id will be mapped to final plan's scan node
                     context.getNereidsIdToPlanNodeIdMap().put(filter.getId(), planNode.getId());
                     addPlanRoot(inputFragment, planNode, filter);
                 }

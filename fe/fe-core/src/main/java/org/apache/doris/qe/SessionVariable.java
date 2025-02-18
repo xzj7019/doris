@@ -330,6 +330,7 @@ public class SessionVariable implements Serializable, Writable {
     public static final String ENABLE_HBO_OPTIMIZATION = "enable_hbo_optimization";
     public static final String ENABLE_HBO_INFO_COLLECTION = "enable_hbo_info_collection";
     public static final String HBO_RFSAFE_THRESHOLD = "hbo_rfsafe_threshold";
+    public static final String HBO_ROW_MATCHING_THRESHOLD = "hbo_row_matching_threshold";
     public static final String NTH_OPTIMIZED_PLAN = "nth_optimized_plan";
 
     public static final String ENABLE_NEREIDS_PLANNER = "enable_nereids_planner";
@@ -1436,6 +1437,10 @@ public class SessionVariable implements Serializable, Writable {
         return hboRfSafeThreshold;
     }
 
+    public double getHboRowMatchingThreshold() {
+        return hboRowMatchingThreshold;
+    }
+
     @VariableMgr.VarAttr(name = ENABLE_HBO_OPTIMIZATION)
     private boolean enableHboOptimization = false;
 
@@ -1449,6 +1454,9 @@ public class SessionVariable implements Serializable, Writable {
     @VariableMgr.VarAttr(name = HBO_RFSAFE_THRESHOLD, needForward = true)
     private double hboRfSafeThreshold = 1.0;
 
+
+    @VariableMgr.VarAttr(name = HBO_ROW_MATCHING_THRESHOLD, needForward = true)
+    private double hboRowMatchingThreshold = 0.1;
 
     /**
      * as the new optimizer is not mature yet, use this var
