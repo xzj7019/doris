@@ -80,7 +80,7 @@ public class TablePlanStatistics extends PlanStatistics {
     }
 
     public boolean hasSamePartitionId(TablePlanStatistics other) {
-        return this.selectedPartitionIds.equals(other);
+        return this.selectedPartitionIds.equals(other.selectedPartitionIds);
     }
 
     public boolean isPartitionedTable() {

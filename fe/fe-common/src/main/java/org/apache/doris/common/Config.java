@@ -1463,7 +1463,8 @@ public class Config extends ConfigBase {
                             + "it will be reclaimed"
             }
     )
-    public static int expire_hbo_cache_in_fe_second = 300;
+    // TODO: consider the cache active timing, 300s is too short
+    public static int expire_hbo_cache_in_fe_second = 300000;
 
     /**
      *  Expire sql sql in frontend time

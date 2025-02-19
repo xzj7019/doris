@@ -120,6 +120,9 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         List<LogicalOlapScan> scans = new ArrayList<>();
         HistoryBasedPlanStatisticsUtil.collectScans(planNode, scans);
         for (LogicalOlapScan scan : scans) {
+            // FIXME: logical scan not contains filter info and can't match the physical filter's info
+            // consider the case that date_dim first with d_moy = 7 but the second not, it will find the entry 0
+            // but correct entry is 1
             String hash = scan.hboTreeString();
             hash = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(hash);
             PlanNodeWithHash planNodeWithHash = new PlanNodeWithHash(scan, Optional.of(hash));
