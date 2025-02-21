@@ -529,32 +529,46 @@ public class Profile {
         // it is mainly for accurate matching under RETRY
         // by design, the accurate entry in the lastRunEntries will have only ONE entry
         Optional<Integer> accurateStatsIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
-                oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0, false);
+                oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0,
+                true, true, true);
         if (accurateStatsIndex.isPresent()) {
             newLastRunsStatistics.remove(accurateStatsIndex.get().intValue());
         } else {
+            /*
+            // TODO: need to test this usability
             // secondly partial matching, i.e, the same partition ids,
             //                                 but other predicate with the different constant or else
             // the returned entry will have the same partition ids restriction and the row count threshold protection
-            Optional<Integer> accurateStatsOnlyMatchPartitionIndex
+            Optional<Integer> accurateStatsMatchPartitionAndOtherPredicateIndex
                     = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
-                    oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0, true);
-            if (accurateStatsOnlyMatchPartitionIndex.isPresent()) {
-                newLastRunsStatistics.remove(accurateStatsOnlyMatchPartitionIndex.get().intValue());
+                    oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0,
+                    true, false, true);
+            if (accurateStatsMatchPartitionAndOtherPredicateIndex.isPresent()) {
+                newLastRunsStatistics.remove(accurateStatsMatchPartitionAndOtherPredicateIndex.get().intValue());
             } else {
-                // if full matching can't be found, try to find the similar entry
-                // similar matching, i.e, the same partition number(key hashing has ensured this point)
-                //                        the same other predicate pattern but with the different constant
-                // it is mainly for the regular hbo info matching
-                // by design, this part of similar entries will have multiple entries, which corresponding
-                // different constant parameter with the different cards. input info.
-                // this matching return value must have a threshold protection, which NOT over a value such as 0.1
-                Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
-                        oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0);
-                if (similarStatsIndex.isPresent()) {
-                    newLastRunsStatistics.remove(similarStatsIndex.get().intValue());
+                // TODO: need to test this usability which not ensure the other predicate
+                Optional<Integer> accurateStatsMatchPartitionOnlyIndex
+                        = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                        oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0,
+                        true, false, false);
+                if (accurateStatsMatchPartitionOnlyIndex.isPresent()) {
+                    // TODO: this unsafe remove will have bad impact maybe
+                    newLastRunsStatistics.remove(accurateStatsMatchPartitionOnlyIndex.get().intValue());
+                } else {
+                    // if full matching can't be found, try to find the similar entry
+                    // similar matching, i.e, the same partition number(key hashing has ensured this point)
+                    //                        the same other predicate pattern but with the different constant
+                    // it is mainly for the regular hbo info matching
+                    // by design, this part of similar entries will have multiple entries, which corresponding
+                    // different constant parameter with the different cards. input info.
+                    // this matching return value must have a threshold protection, which NOT over a value such as 0.1
+                    Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
+                            oldHistoricalPlanStatistics, newInputTableStatistics, 0.1, 1.0);
+                    if (similarStatsIndex.isPresent()) {
+                        newLastRunsStatistics.remove(similarStatsIndex.get().intValue());
+                    }
                 }
-            }
+            }*/
         }
         // the newListRunsStatistics list performs likes a fifo way
         newLastRunsStatistics.add(new HistoricalPlanStatisticsEntry(newPlanStatistics, newInputTableStatistics));

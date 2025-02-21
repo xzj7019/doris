@@ -54,10 +54,24 @@ public class TablePlanStatistics extends PlanStatistics {
         this.isPartitionedTable = isPartitionedTable;
         this.partitionInfo = partitionInfo;
         this.selectedPartitionIds = ImmutableList.copyOf(selectedPartitionIds);
-        splitPartitionColumnPredicatesAndOthers();
+        buildPartitionColumnPredicatesAndOthers(tableFilterSet, partitionInfo);
     }
 
-    private void splitPartitionColumnPredicatesAndOthers() {
+    public TablePlanStatistics(PlanStatistics other, Set<Expression> tableFilterSet,
+            boolean isPartitionedTable, PartitionInfo partitionInfo, List<Long> selectedPartitionIds) {
+        super(other.nodeId, other.inputRows, other.outputRows, other.commonFilteredRows, other.commonFilterInputRows, other.runtimeFilteredRows,
+                other.runtimeFilterInputRows, other.joinBuilderRows, other.joinProbeRows, other.joinBuilderSkewRatio, other.joinProbeSkewRatio,
+                other.instanceNum);
+        this.tableFilterSet = tableFilterSet;
+        this.isPartitionedTable = isPartitionedTable;
+        this.partitionInfo = partitionInfo;
+        this.selectedPartitionIds = ImmutableList.copyOf(selectedPartitionIds);
+        buildPartitionColumnPredicatesAndOthers(tableFilterSet, partitionInfo);
+    }
+
+    public void buildPartitionColumnPredicatesAndOthers(Set<Expression> tableFilterSet, PartitionInfo partitionInfo) {
+        partitionColumnPredicates.clear();
+        otherPredicate.clear();
         for (Expression expr : tableFilterSet) {
             Set<Slot> inputSlot = expr.getInputSlots();
             if (inputSlot.size() == 1 && inputSlot.iterator().next() instanceof SlotReference
@@ -77,6 +91,11 @@ public class TablePlanStatistics extends PlanStatistics {
     public boolean hasSameOtherPredicates(TablePlanStatistics other) {
         return this.otherPredicate.containsAll(other.otherPredicate)
                 && other.otherPredicate.containsAll(this.otherPredicate);
+    }
+
+    public boolean hasSamePartitionColumnPredicates(TablePlanStatistics other) {
+        return this.partitionColumnPredicates.containsAll(other.partitionColumnPredicates)
+                && other.partitionColumnPredicates.containsAll(this.partitionColumnPredicates);
     }
 
     public boolean hasSamePartitionId(TablePlanStatistics other) {

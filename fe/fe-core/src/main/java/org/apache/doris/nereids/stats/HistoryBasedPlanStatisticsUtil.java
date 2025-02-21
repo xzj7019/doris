@@ -41,9 +41,12 @@ public class HistoryBasedPlanStatisticsUtil {
     public static Optional<Integer> getAccurateStatsIndex(
             HistoricalPlanStatistics historicalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
+            // TODO: wrap the following multiple control config into a stretagy structure as a whole
             double rowThreshold,
             double hboRfSafeThreshold,
-            boolean onlyMatchPartition)
+            boolean needMatchPartition,
+            boolean needMatchPartitionColumnPredicate,
+            boolean needMatchOtherColumnPredicate)
     {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = historicalPlanStatistics.getLastRunsStatistics();
         if (lastRunsStatistics.isEmpty()) {
@@ -57,15 +60,20 @@ public class HistoryBasedPlanStatisticsUtil {
             boolean accurateMatch = true;
             for (int inputTablesIndex = 0; accurateMatch && inputTablesIndex < inputTableStatistics.size(); ++inputTablesIndex) {
                 TablePlanStatistics currentInputStatistics = (TablePlanStatistics) inputTableStatistics.get(inputTablesIndex);
-                TablePlanStatistics historicalInputStatistics = (TablePlanStatistics)  lastRunsStatistics.get(lastRunsIndex)
+                TablePlanStatistics historicalInputStatistics = (TablePlanStatistics) lastRunsStatistics.get(lastRunsIndex)
                         .getInputTableStatistics().get(inputTablesIndex);
                 // check if rf safe
                 boolean isRFSafe = historicalInputStatistics.isRuntimeFilterSafeNode(hboRfSafeThreshold);
                 if (!isRFSafe) {
                     accurateMatch = false;
-                } else {
+                } else if (!currentInputStatistics.isPartitionedTable() && !historicalInputStatistics.isPartitionedTable()) {
+                    accurateMatch = canAccurateMatchForNonPartitionTable(currentInputStatistics, historicalInputStatistics);
+                } else if (currentInputStatistics.isPartitionedTable() && historicalInputStatistics.isPartitionedTable()) {
                     // find the first full matching entry in lastRunEntries
-                    accurateMatch = accurateMatch(currentInputStatistics, historicalInputStatistics, rowThreshold, onlyMatchPartition);
+                    accurateMatch = canAccurateMatchForPartitionTable(currentInputStatistics, historicalInputStatistics, rowThreshold,
+                            needMatchPartition, needMatchPartitionColumnPredicate, needMatchOtherColumnPredicate);
+                } else {
+                    throw new RuntimeException("unexpected state during hbo input table stats matching");
                 }
             }
             if (accurateMatch) {
@@ -75,29 +83,35 @@ public class HistoryBasedPlanStatisticsUtil {
         return Optional.empty();
     }
 
-    public static boolean accurateMatch(TablePlanStatistics currentInputStatistics,
-            TablePlanStatistics historicalInputStatistics, double rowThreshold, boolean onlyMatchingPartition) {
-        if (currentInputStatistics.isPartitionedTable() && historicalInputStatistics.isPartitionedTable()) {
-            // for partition table, must ensure the pruned partition is the same
-            // and the other predicate with the constant is the same
-            boolean hasSamePartition = currentInputStatistics.hasSamePartitionId(historicalInputStatistics);
-            boolean hasSameOtherPredicate = currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
-            // if onlyMatchingPartition is true, the matching condition will be
-            // 1. the pruned partition ids are the same
-            // 2. the row count threshold is in the threshold
-            if (onlyMatchingPartition) {
-                return hasSamePartition && similarStats(currentInputStatistics.getOutputRows(),
-                        historicalInputStatistics.getOutputRows(), rowThreshold);
-            } else {
-                // if all predicates are the same, just return the accurate entry's index
-                return hasSamePartition && hasSameOtherPredicate;
-            }
-        } else if (!currentInputStatistics.isPartitionedTable() && !historicalInputStatistics.isPartitionedTable()) {
-            // for non-partition table, must ensure the other predicate with the constant is the same
-            boolean hasSameOtherPredicate = currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
-            return hasSameOtherPredicate;
+    public static boolean canAccurateMatchForNonPartitionTable(TablePlanStatistics currentInputStatistics,
+            TablePlanStatistics historicalInputStatistics) {
+        return currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
+    }
+
+    public static boolean canAccurateMatchForPartitionTable(TablePlanStatistics currentInputStatistics,
+            TablePlanStatistics historicalInputStatistics, double rowThreshold,
+            boolean needMatchSelectedPartition, boolean needMatchPartitionColumnPredicate, boolean needMatchOtherPredicate) {
+        // for partition table, must ensure
+        // 1. the pruned partition is the same
+        // 2. partition column predicate is the exactly same(for single value partition it is not sepecial, but for range partition,
+        //    although the select partition id is the same, but the partition column filter may not be the same, which may have impact
+        //    on the hbo cache searching and matching)
+        // 3. the other predicate with the constant is the same
+        boolean hasSamePartition = currentInputStatistics.hasSamePartitionId(historicalInputStatistics);
+        boolean hasSamePartitionColumnPredicate = currentInputStatistics.hasSamePartitionColumnPredicates(historicalInputStatistics);
+        boolean hasSameOtherPredicate = currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
+        boolean hasSimilarStats = similarStats(currentInputStatistics.getOutputRows(),
+                historicalInputStatistics.getOutputRows(), rowThreshold);
+        if (needMatchSelectedPartition && needMatchPartitionColumnPredicate && needMatchOtherPredicate) {
+            return hasSamePartition && hasSamePartitionColumnPredicate && hasSameOtherPredicate;
+        } else if (needMatchSelectedPartition && !needMatchPartitionColumnPredicate && needMatchOtherPredicate) {
+            return hasSamePartition && !hasSamePartitionColumnPredicate && hasSameOtherPredicate && hasSimilarStats;
+        } else if (needMatchSelectedPartition && needMatchPartitionColumnPredicate && !needMatchOtherPredicate) {
+            return hasSamePartition && hasSamePartitionColumnPredicate && hasSimilarStats;
+        } else if (needMatchSelectedPartition && !needMatchPartitionColumnPredicate && !needMatchOtherPredicate) {
+            return hasSamePartition && hasSimilarStats;
         } else {
-            throw new RuntimeException("unexpected state during hbo input table stats matching");
+            return hasSimilarStats;
         }
     }
 
@@ -188,22 +202,36 @@ public class HistoryBasedPlanStatisticsUtil {
             return Optional.empty();
         }
 
+        // TODO: if only non-partition table exists, the following 4 steps may be redundant
+        // MATCH 1:
         // firstly full matching, i.e, the same partition ids,
         //                             the same other predicate with the same constant
         // it is mainly for accurate matching under RETRY
         // by design, the accurate entry in the lastRunEntries will have only ONE entry
         Optional<Integer> accurateStatsIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
-                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold, false);
+                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold,
+                true, true, true);
         if (accurateStatsIndex.isPresent()) {
             return Optional.of(lastRunsStatistics.get(accurateStatsIndex.get()));
         }
 
-        Optional<Integer> accurateStatsOnlyMatchPartitionIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
-                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold, true);
-        if (accurateStatsOnlyMatchPartitionIndex.isPresent()) {
-            return Optional.of(lastRunsStatistics.get(accurateStatsOnlyMatchPartitionIndex.get()));
+        // MATCH 2:
+        Optional<Integer> accurateStatsMatchPartitionIdAndOtherPredicateIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold,
+                true, false, true);
+        if (accurateStatsMatchPartitionIdAndOtherPredicateIndex.isPresent()) {
+            return Optional.of(lastRunsStatistics.get(accurateStatsMatchPartitionIdAndOtherPredicateIndex.get()));
         }
 
+        // MATCH 3: TODO: reconsider this option's safety
+        Optional<Integer> accurateStatsOnlyMatchPartitionIdIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold,
+                true, false, false);
+        if (accurateStatsOnlyMatchPartitionIdIndex.isPresent()) {
+            return Optional.of(lastRunsStatistics.get(accurateStatsOnlyMatchPartitionIdIndex.get()));
+        }
+
+        // MATCH 4: TODO: this option is actually useless
         Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
                 oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
         if (similarStatsIndex.isPresent()) {

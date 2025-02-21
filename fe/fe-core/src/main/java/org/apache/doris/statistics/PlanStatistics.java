@@ -30,18 +30,18 @@ import java.util.Set;
 
 
 public class PlanStatistics {
-    private final int nodeId;
-    private final long inputRows;
-    private final long outputRows;
-    private final long commonFilteredRows;
-    private final long commonFilterInputRows;
-    private final long runtimeFilteredRows;
-    private final long runtimeFilterInputRows;
-    private final long joinBuilderRows;
-    private final long joinProbeRows;
-    private final int joinBuilderSkewRatio;
-    private final int joinProbeSkewRatio;
-    private final int instanceNum;
+    protected final int nodeId;
+    protected final long inputRows;
+    protected final long outputRows;
+    protected final long commonFilteredRows;
+    protected final long commonFilterInputRows;
+    protected final long runtimeFilteredRows;
+    protected final long runtimeFilterInputRows;
+    protected final long joinBuilderRows;
+    protected final long joinProbeRows;
+    protected final int joinBuilderSkewRatio;
+    protected final int joinProbeSkewRatio;
+    protected final int instanceNum;
 
     public static final PlanStatistics EMPTY = new PlanStatistics(
             -1, -1, -1, -1, -1, -1, -1,
