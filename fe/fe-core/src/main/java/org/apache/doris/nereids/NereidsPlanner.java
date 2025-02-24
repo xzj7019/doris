@@ -56,6 +56,7 @@ import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.ComputeResultSet;
 import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.algebra.CatalogRelation;
 import org.apache.doris.nereids.trees.plans.commands.ExplainCommand.ExplainLevel;
 import org.apache.doris.nereids.trees.plans.distribute.DistributePlanner;
@@ -466,13 +467,18 @@ public class NereidsPlanner extends Planner {
             // fill table to expr map
             if (root instanceof PhysicalFilter && root.children().get(0) instanceof PhysicalOlapScan) {
                 PhysicalOlapScan tableScan = (PhysicalOlapScan) root.children().get(0);
-                Map<TableIf, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
+                Map<RelationId, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
                         .getHistoryBasedIdToPlanMapProvider().getTableToExprMap(queryId);
                 if (tableToFilterExprMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().putTableToExprMap(queryId, tableToFilterExprMap);
+                } else {
+                    Set<Expression> conjuncts = tableToFilterExprMap.get(tableScan.getRelationId());
+                    if (!conjuncts.equals(((PhysicalFilter) root).getConjuncts())) {
+                        throw new AnalysisException("unexpected status at tableToFilterExprMap");
+                    }
                 }
-                tableToFilterExprMap.put(tableScan.getTable(), ((PhysicalFilter) root).getConjuncts());
+                tableToFilterExprMap.put(tableScan.getRelationId(), ((PhysicalFilter) root).getConjuncts());
             }
         }
     }

@@ -23,6 +23,7 @@ import org.apache.doris.nereids.rules.Rule;
 import org.apache.doris.nereids.rules.RuleType;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.qe.ConnectContext;
 
@@ -47,13 +48,13 @@ public class CollectScanFilterForHbo implements RewriteRuleFactory {
                     }
                     LogicalOlapScan scan = (LogicalOlapScan) filter.child();
                     String queryId = DebugUtil.printId(ConnectContext.get().queryId());
-                    Map<TableIf, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
+                    Map<RelationId, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().getTableToExprMap(queryId);
                     if (tableToFilterExprMap.isEmpty()) {
                         HistoryBasedPlanStatisticsManager.getInstance()
                                 .getHistoryBasedIdToPlanMapProvider().putTableToExprMap(queryId, tableToFilterExprMap);
                     }
-                    tableToFilterExprMap.put(scan.getTable(), filter.getConjuncts());
+                    tableToFilterExprMap.put(scan.getRelationId(), filter.getConjuncts());
                     return filter;
                 })),
 
@@ -65,13 +66,13 @@ public class CollectScanFilterForHbo implements RewriteRuleFactory {
                     }
                     LogicalOlapScan scan = (LogicalOlapScan) filter.child().child();
                     String queryId = DebugUtil.printId(ConnectContext.get().queryId());
-                    Map<TableIf, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
+                    Map<RelationId, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().getTableToExprMap(queryId);
                     if (tableToFilterExprMap.isEmpty()) {
                         HistoryBasedPlanStatisticsManager.getInstance()
                                 .getHistoryBasedIdToPlanMapProvider().putTableToExprMap(queryId, tableToFilterExprMap);
                     }
-                    tableToFilterExprMap.put(scan.getTable(), filter.getConjuncts());
+                    tableToFilterExprMap.put(scan.getRelationId(), filter.getConjuncts());
                     return filter;
                 }))
         );

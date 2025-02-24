@@ -30,6 +30,7 @@ import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.distribute.DistributedPlan;
 import org.apache.doris.nereids.trees.plans.distribute.FragmentIdMapping;
 import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
@@ -414,7 +415,7 @@ public class Profile {
     }
 
     public PlanNodeCanonicalInfo buildPlanNodeCanonicalInfo(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
-            Map<TableIf, Set<Expression>> tableToExprMap,
+            Map<RelationId, Set<Expression>> tableToExprMap,
             List<TPlanNodeRuntimeStatsItem> runtimeStatsItem) {
         String canonicalPlanString = ((AbstractPhysicalPlan) root).hboTreeString();
         String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
@@ -435,7 +436,7 @@ public class Profile {
 
     public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> generatePlanStatisticsMap(
             Map<Integer, PhysicalPlan> idToPlanMap, Map<PhysicalPlan, Integer> planToIdMap,
-            Map<TableIf, Set<Expression>> tableToExprMap,
+            Map<RelationId, Set<Expression>> tableToExprMap,
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
@@ -483,7 +484,7 @@ public class Profile {
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
         Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
         Map<PhysicalPlan, Integer> planToIdMap = idToMapProvider.getPlanToIdMap(queryId);
-        Map<TableIf, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
+        Map<RelationId, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
         if (!idToPlanMap.isEmpty() && idToPlanMap.size() == planToIdMap.size()) {
             // get plan statistics
             Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = generatePlanStatisticsMap(idToPlanMap,

@@ -29,6 +29,7 @@ import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.algebra.Aggregate;
 import org.apache.doris.nereids.trees.plans.algebra.Filter;
 import org.apache.doris.nereids.trees.plans.algebra.Join;
@@ -258,7 +259,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
 
         String queryId = DebugUtil.printId(cascadesContext.getConnectContext().queryId());
-        Map<TableIf, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
+        Map<RelationId, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
         // FIXME: current queryId's idToPlanMap is NOT available NOW
         //Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
         ImmutableList.Builder<PlanStatistics> outputTableStatisticsBuilder = ImmutableList.builder();
@@ -270,7 +271,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
             //    throw new RuntimeException("unexpected plan node type");
             //}
             PhysicalOlapScan tableScan = ((TablePlanStatistics) inputTableStatistics).getTable();
-            Set<Expression> tableFilterSet = tableToExprMap.get(tableScan.getTable());
+            Set<Expression> tableFilterSet = tableToExprMap.get(tableScan.getRelationId());
 
             // here is the assumption that the table is always same with different table id(TODO: verify this)
             TablePlanStatistics newInputPlanStatistics = new TablePlanStatistics(inputTableStatistics, tableScan, tableFilterSet,

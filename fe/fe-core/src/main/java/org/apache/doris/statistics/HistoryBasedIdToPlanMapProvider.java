@@ -5,6 +5,7 @@ import org.apache.doris.common.Config;
 import org.apache.doris.common.ConfigBase.DefaultConfHandler;
 import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsManager;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.plans.RelationId;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class HistoryBasedIdToPlanMapProvider {
     private volatile Cache<String, Map<Integer, PhysicalPlan>> idToPlanCache;
     private volatile Cache<String, Map<PhysicalPlan, Integer>> planToIdCache;
-    private volatile Cache<String, Map<TableIf, Set<Expression>>> tableToFilterCache;
+    private volatile Cache<String, Map<RelationId, Set<Expression>>> tableToFilterCache;
     public HistoryBasedIdToPlanMapProvider() {
         idToPlanCache = buildHboIdToPlanCache(
                 Config.hbo_cache_manage_num,
@@ -35,7 +36,7 @@ public class HistoryBasedIdToPlanMapProvider {
         );
     }
 
-    private static Cache<String, Map<TableIf, Set<Expression>>> buildHboTableToFilterCache(int hboCacheNum,
+    private static Cache<String, Map<RelationId, Set<Expression>>> buildHboTableToFilterCache(int hboCacheNum,
             long expireAfterAccessSeconds) {
         Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder()
                 // auto evict cache when jvm memory too low
@@ -97,11 +98,11 @@ public class HistoryBasedIdToPlanMapProvider {
         planToIdCache.put(queryId, idToPlanMap);
     }
 
-    public Map<TableIf, Set<Expression>> getTableToExprMap(String queryId) {
+    public Map<RelationId, Set<Expression>> getTableToExprMap(String queryId) {
         return tableToFilterCache.asMap().getOrDefault(queryId, new ConcurrentHashMap<>());
     }
 
-    public void putTableToExprMap(String queryId, Map<TableIf, Set<Expression>> tableToExprMap) {
+    public void putTableToExprMap(String queryId, Map<RelationId, Set<Expression>> tableToExprMap) {
         tableToFilterCache.put(queryId, tableToExprMap);
     }
 
@@ -131,7 +132,7 @@ public class HistoryBasedIdToPlanMapProvider {
                 Config.hbo_cache_manage_num,
                 Config.expire_hbo_cache_in_fe_second
         );
-        Cache<String, Map<TableIf, Set<Expression>>> tableToExprCache = buildHboTableToFilterCache(
+        Cache<String, Map<RelationId, Set<Expression>>> tableToExprCache = buildHboTableToFilterCache(
                 Config.hbo_cache_manage_num,
                 Config.expire_hbo_cache_in_fe_second
         );
