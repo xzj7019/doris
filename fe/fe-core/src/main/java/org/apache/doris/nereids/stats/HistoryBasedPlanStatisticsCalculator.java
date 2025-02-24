@@ -137,18 +137,14 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
     }
 
     private Statistics getStatsFromHbo(AbstractPlan planNode, Statistics delegateStats) {
-        boolean isFilterOnTs = false;
-        AbstractPlan originalPlanNode = planNode;
         if (planNode instanceof Filter) {
             // handle filter to access scan, whose child is scan which ensured before
             if (isLogicalFilterOnLogicalScan((Filter) planNode)) {
                 planNode = (LogicalOlapScan) ((GroupPlan) ((LogicalFilter) planNode).child())
                         .getGroup().getLogicalExpressions().get(0).getPlan();
-                isFilterOnTs = true;
             } else if (isPhysicalFilterOnPhysicalScan((Filter) planNode)) {
                 planNode = (PhysicalOlapScan) ((GroupPlan) ((PhysicalFilter) planNode).child())
                         .getGroup().getPhysicalExpressions().get(0).getPlan();
-                isFilterOnTs = true;
             } else {
                 throw new AnalysisException("unexpected filter type");
             }
@@ -178,7 +174,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
             // use entry 0 or the last entry will be considered
             // entry 0: the oldest entry
             // entry last: the newest entry
-            int selectedIndex = planStatistics.getLastRunsStatistics().size() - 1;
+            int initialSelectedIndex = planStatistics.getLastRunsStatistics().size() - 1;
             double hboRfsafeThreshold = -1.0;
             double rowCountMatchingThreshold = 0.1;
             boolean isEnableHboNonStrictMatchingMode = false;
@@ -190,12 +186,12 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
                         .getHboRowMatchingThreshold();
                 isEnableHboNonStrictMatchingMode = cascadesContext.getConnectContext().getSessionVariable()
                         .isEnableHboNonStrictMatchingMode();
-                if (isEnableHboNonStrictMatchingMode) {
-                    // TODO: FIX this
-                    selectedIndex = 0;
+                if (isEnableHboNonStrictMatchingMode) { // TODO: FIX this
+                    initialSelectedIndex = 0;
                 }
             }
-            List<PlanStatistics> currentInputTableStatistics = planStatistics.getLastRunsStatistics().get(selectedIndex).getInputTableStatistics();
+            List<PlanStatistics> currentInputTableStatistics = planStatistics.getLastRunsStatistics()
+                    .get(initialSelectedIndex).getInputTableStatistics();
             if (!currentInputTableStatistics.isEmpty()) {
                 Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(currentInputTableStatistics, true);
                 if (inputTableStatistics.isPresent()) {
