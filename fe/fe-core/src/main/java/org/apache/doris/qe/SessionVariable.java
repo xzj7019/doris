@@ -329,6 +329,8 @@ public class SessionVariable implements Serializable, Writable {
     public static final String ENABLE_LEFT_ZIG_ZAG = "enable_left_zig_zag";
     public static final String ENABLE_HBO_OPTIMIZATION = "enable_hbo_optimization";
     public static final String ENABLE_HBO_INFO_COLLECTION = "enable_hbo_info_collection";
+
+    public static final String ENABLE_HBO_NONSTRICT_MATCHING_MODE = "enable_hbo_nonstrict_matching_mode";
     public static final String HBO_RFSAFE_THRESHOLD = "hbo_rfsafe_threshold";
     public static final String HBO_ROW_MATCHING_THRESHOLD = "hbo_row_matching_threshold";
     public static final String NTH_OPTIMIZED_PLAN = "nth_optimized_plan";
@@ -1448,8 +1450,15 @@ public class SessionVariable implements Serializable, Writable {
         return enableHboInfoCollection;
     }
 
+    public boolean isEnableHboNonStrictMatchingMode() {
+        return enableHboNonStrictMatchingMode;
+    }
+
     @VariableMgr.VarAttr(name = ENABLE_HBO_INFO_COLLECTION)
     private boolean enableHboInfoCollection = false;
+
+    @VariableMgr.VarAttr(name = ENABLE_HBO_NONSTRICT_MATCHING_MODE)
+    private boolean enableHboNonStrictMatchingMode = false;
 
     @VariableMgr.VarAttr(name = HBO_RFSAFE_THRESHOLD, needForward = true)
     private double hboRfSafeThreshold = 1.0;

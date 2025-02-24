@@ -17,6 +17,9 @@
 
 package org.apache.doris.nereids.stats;
 
+import org.apache.doris.catalog.PartitionInfo;
+import org.apache.doris.catalog.TableIf;
+import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.exceptions.AnalysisException;
 import org.apache.doris.nereids.memo.GroupExpression;
@@ -36,12 +39,15 @@ import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalFilter;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.planner.PlanNodeWithHash;
 import org.apache.doris.statistics.ColumnStatistic;
 import org.apache.doris.statistics.ColumnStatisticBuilder;
 import org.apache.doris.statistics.HistoricalPlanStatistics;
 import org.apache.doris.statistics.HistoricalPlanStatisticsEntry;
+import org.apache.doris.statistics.HistoryBasedIdToPlanMapProvider;
 import org.apache.doris.statistics.HistoryBasedPlanStatisticsProvider;
+import org.apache.doris.statistics.InMemoryHistoryBasedPlanStatisticsProvider;
 import org.apache.doris.statistics.PlanStatistics;
 import org.apache.doris.statistics.Statistics;
 import org.apache.doris.statistics.TablePlanStatistics;
@@ -52,6 +58,7 @@ import com.google.common.collect.Maps;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -166,45 +173,73 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         // it may find the wrong entry for the different filter pattern
         // by contract, use current planStatistics is safe because the plan hash has ensure the plan hbo string
         // is matched, although the detailed constant may note be same
-        //Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(planNode, true);
         if (!planStatistics.getLastRunsStatistics().isEmpty()) {
-            // FIXME: always get 0 will be wrong
-            // since the existing cache always has entry 0 and it will always hit entry 0 all the time
-            // TODO: try to use the last entry as a replacement, refer updatePlanStatistics(latest insertion as the last index)
-            Optional<List<PlanStatistics>> currentInputTableStatistics = Optional.of(planStatistics
-                    .getLastRunsStatistics().get(0).getInputTableStatistics());
-            // NOTE: must update the partition and common filter at input plan statistics
-            // in order to match the filter(but actually a TablePlanStatistics) entry in the hbo cache
-            // i.e, logical filter node is mapped to TablePlanStatistics in hbo cache(important!!!)
-            if (currentInputTableStatistics.isPresent()) {
-                // extract filters info out to update inputTableStatistics as a current search key
-                List<PlanStatistics> inputTableStatistics = currentInputTableStatistics.get();
-                // TODO: for join node, it will update the filter info for the input plan statistics
-                // it will find the wrong cache entry
-                if (isFilterOnTs) {
-                    inputTableStatistics = updateCurrentInputTableStatisticsWithFilter(inputTableStatistics,
-                            (Filter) originalPlanNode, (OlapScan) planNode);
+            // TODO: the currentInputTableStatistics is the mocked one which needs to be updated with current filter, etc
+            // use entry 0 or the last entry will be considered
+            // entry 0: the oldest entry
+            // entry last: the newest entry
+            int selectedIndex = planStatistics.getLastRunsStatistics().size() - 1;
+            double hboRfsafeThreshold = -1.0;
+            double rowCountMatchingThreshold = 0.1;
+            boolean isEnableHboNonStrictMatchingMode = false;
+            if (cascadesContext.getConnectContext() != null
+                    && cascadesContext.getConnectContext().getSessionVariable() != null) {
+                hboRfsafeThreshold = cascadesContext.getConnectContext().getSessionVariable()
+                        .getHboRfSafeThreshold();
+                rowCountMatchingThreshold = cascadesContext.getConnectContext().getSessionVariable()
+                        .getHboRowMatchingThreshold();
+                isEnableHboNonStrictMatchingMode = cascadesContext.getConnectContext().getSessionVariable()
+                        .isEnableHboNonStrictMatchingMode();
+                if (isEnableHboNonStrictMatchingMode) {
+                    // TODO: FIX this
+                    selectedIndex = 0;
                 }
-                double hboRfsafeThreshold = -1.0;
-                double rowCountMatchingThreshold = 0.1;
-                if (cascadesContext.getConnectContext() != null
-                        && cascadesContext.getConnectContext().getSessionVariable() != null) {
-                    hboRfsafeThreshold = cascadesContext.getConnectContext().getSessionVariable()
-                            .getHboRfSafeThreshold();
-                    rowCountMatchingThreshold = cascadesContext.getConnectContext().getSessionVariable()
-                            .getHboRowMatchingThreshold();
-                }
-                Optional<HistoricalPlanStatisticsEntry> historicalPlanStatisticsEntry
-                        = HistoryBasedPlanStatisticsUtil.getSelectedHistoricalPlanStatisticsEntry
-                        (planStatistics, inputTableStatistics, rowCountMatchingThreshold, hboRfsafeThreshold);
-                if (historicalPlanStatisticsEntry.isPresent()) {
-                    PlanStatistics predictedPlanStatistics = historicalPlanStatisticsEntry.get().getPlanStatistics();
-                    // todo: choose which one is the output rows count
-                    delegateStats = delegateStats.withRowCountAndEnforceValid(predictedPlanStatistics.getOutputRows());
+            }
+            List<PlanStatistics> currentInputTableStatistics = planStatistics.getLastRunsStatistics().get(selectedIndex).getInputTableStatistics();
+            if (!currentInputTableStatistics.isEmpty()) {
+                Optional<List<PlanStatistics>> inputTableStatistics = getPlanNodeInputTableStatistics(currentInputTableStatistics, true);
+                if (inputTableStatistics.isPresent()) {
+                    //if (!planStatistics.getLastRunsStatistics().isEmpty() && inputTableStatistics.isPresent()) {
+                    // FIXME: always get 0 will be wrong
+                    // since the existing cache always has entry 0 and it will always hit entry 0 all the time
+                    // TODO: try to use the last entry as a replacement, refer updatePlanStatistics(latest insertion as the last index)
+                    //Optional<List<PlanStatistics>> currentInputTableStatistics = Optional.of(planStatistics
+                    //        .getLastRunsStatistics().get(0).getInputTableStatistics());
+                    // NOTE: must update the partition and common filter at input plan statistics
+                    // in order to match the filter(but actually a TablePlanStatistics) entry in the hbo cache
+                    // i.e, logical filter node is mapped to TablePlanStatistics in hbo cache(important!!!)
+                    //if (currentInputTableStatistics.isPresent()) {
+                    // extract filters info out to update inputTableStatistics as a current search key
+                    //List<PlanStatistics> inputTableStatistics = currentInputTableStatistics.get();
+                    // TODO: for join node, it will update the filter info for the input plan statistics
+                    // it will find the wrong cache entry
+                    //if (isFilterOnTs) {
+                    //    inputTableStatistics = updateCurrentInputTableStatisticsWithFilter(inputTableStatistics,
+                    //            (Filter) originalPlanNode, (OlapScan) planNode);
+                    //} else {
+                    //}
+                    Optional<HistoricalPlanStatisticsEntry> historicalPlanStatisticsEntry
+                            = HistoryBasedPlanStatisticsUtil.getSelectedHistoricalPlanStatisticsEntry
+                            (planStatistics, inputTableStatistics.get(), rowCountMatchingThreshold, hboRfsafeThreshold, isEnableHboNonStrictMatchingMode);
+                    if (historicalPlanStatisticsEntry.isPresent()) {
+                        PlanStatistics predictedPlanStatistics = historicalPlanStatisticsEntry.get()
+                                .getPlanStatistics();
+                        // todo: choose which one is the output rows count
+                        delegateStats = delegateStats.withRowCountAndEnforceValid(
+                                predictedPlanStatistics.getOutputRows());
+                    }
                 }
             }
         }
         return delegateStats;
+    }
+
+    /*
+    private List<PlanStatistics> updateCurrentInputTableStatisticsByTableExprMap(List<PlanStatistics> currentInputTableStatistics) {
+        HistoryBasedPlanStatisticsManager hboManager = HistoryBasedPlanStatisticsManager.getInstance();
+        HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
+        String queryId = DebugUtil.printId(cascadesContext.getConnectContext().queryId());
+        Map<TableIf, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
     }
 
     private List<PlanStatistics> updateCurrentInputTableStatisticsWithFilter(List<PlanStatistics> currentInputTableStatistics,
@@ -219,12 +254,43 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
                 scan.getTable().isPartitionedTable(), scan.getTable().getPartitionInfo(), scan.getSelectedPartitionIds());
         outputTableStatisticsBuilder.add(newInputPlanStatistics);
         return outputTableStatisticsBuilder.build();
+    }*/
+
+    private Optional<List<PlanStatistics>> getPlanNodeInputTableStatistics(
+            List<PlanStatistics> currentInputTableStatistics, boolean cacheOnly) {
+        HistoryBasedPlanStatisticsManager hboManager = HistoryBasedPlanStatisticsManager.getInstance();
+        HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
+
+        String queryId = DebugUtil.printId(cascadesContext.getConnectContext().queryId());
+        Map<TableIf, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
+        // FIXME: current queryId's idToPlanMap is NOT available NOW
+        //Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
+        ImmutableList.Builder<PlanStatistics> outputTableStatisticsBuilder = ImmutableList.builder();
+
+        for (PlanStatistics inputTableStatistics : currentInputTableStatistics) {
+            //int tableNodeId = inputTableStatistics.getNodeId();
+            //PhysicalPlan planNode = idToPlanMap.get(tableNodeId);
+            //if (!(planNode instanceof PhysicalOlapScan)) {
+            //    throw new RuntimeException("unexpected plan node type");
+            //}
+            PhysicalOlapScan tableScan = ((TablePlanStatistics) inputTableStatistics).getTable();
+            Set<Expression> tableFilterSet = tableToExprMap.get(tableScan.getTable());
+
+            // here is the assumption that the table is always same with different table id(TODO: verify this)
+            TablePlanStatistics newInputPlanStatistics = new TablePlanStatistics(inputTableStatistics, tableScan, tableFilterSet,
+                    tableScan.getTable().isPartitionedTable(), tableScan.getTable().getPartitionInfo(),
+                    tableScan.getSelectedPartitionIds());
+            outputTableStatisticsBuilder.add(newInputPlanStatistics);
+        }
+        return Optional.of(outputTableStatisticsBuilder.build());
     }
 
-    private Optional<List<PlanStatistics>> getPlanNodeInputTableStatistics(AbstractPlan planNode, boolean cacheOnly)
-    {
+    /*
+    private Optional<List<PlanStatistics>> getPlanNodeInputTableStatistics(AbstractPlan planNode,
+                List<PlanStatistics> currentInputTableStatistics, boolean cacheOnly) {
         ImmutableList.Builder<PlanStatistics> inputTableStatisticsBuilder = ImmutableList.builder();
-        List<LogicalOlapScan> scans = new ArrayList<>();
+        Set<LogicalOlapScan> scans = new HashSet<>();
+        // TODO: cbo stage may miss some scan during memo tree visiting, use the entry 0 instead + replacement
         HistoryBasedPlanStatisticsUtil.collectScans(planNode, scans);
         for (LogicalOlapScan scan : scans) {
             // FIXME: logical scan not contains filter info and can't match the physical filter's info
@@ -248,6 +314,6 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         }
 
         return Optional.of(inputTableStatisticsBuilder.build());
-    }
+    }*/
 }
 

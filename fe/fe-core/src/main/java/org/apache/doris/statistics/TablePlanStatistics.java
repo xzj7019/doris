@@ -18,10 +18,12 @@
 package org.apache.doris.statistics;
 import org.apache.doris.catalog.Column;
 import org.apache.doris.catalog.PartitionInfo;
+import org.apache.doris.catalog.TableIf;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.literal.Literal;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.thrift.TPlanNodeRuntimeStatsItem;
 
@@ -36,6 +38,7 @@ public class TablePlanStatistics extends PlanStatistics {
     //private final Literal lowerPartitionRangeBound;
     //private final Literal upperPartitionRangeBound;
     //private final Set<Literal> otherPredicateConstants;
+    private PhysicalOlapScan table;
     private ImmutableList<Long> selectedPartitionIds;
     private Set<Expression> partitionColumnPredicates = new HashSet<>();
     private Set<Expression> otherPredicate = new HashSet<>();
@@ -45,11 +48,12 @@ public class TablePlanStatistics extends PlanStatistics {
 
     public TablePlanStatistics(int nodeId, long inputRows, long outputRows, long commonFilteredRows,
             long commonFilterInputRows, long runtimeFilteredRows, long runtimeFilterInputRows, long joinBuilderRows,
-            long joinProbeRows, int joinBuilderSkewRatio, int joinProbeSkewRatio, int instanceNum,
+            long joinProbeRows, int joinBuilderSkewRatio, int joinProbeSkewRatio, int instanceNum, PhysicalOlapScan table,
             Set<Expression> tableFilterSet, boolean isPartitionedTable, PartitionInfo partitionInfo, List<Long> selectedPartitionIds) {
         super(nodeId, inputRows, outputRows, commonFilteredRows, commonFilterInputRows, runtimeFilteredRows,
                 runtimeFilterInputRows, joinBuilderRows, joinProbeRows, joinBuilderSkewRatio, joinProbeSkewRatio,
                 instanceNum);
+        this.table = table;
         this.tableFilterSet = tableFilterSet;
         this.isPartitionedTable = isPartitionedTable;
         this.partitionInfo = partitionInfo;
@@ -57,11 +61,12 @@ public class TablePlanStatistics extends PlanStatistics {
         buildPartitionColumnPredicatesAndOthers(tableFilterSet, partitionInfo);
     }
 
-    public TablePlanStatistics(PlanStatistics other, Set<Expression> tableFilterSet,
+    public TablePlanStatistics(PlanStatistics other, PhysicalOlapScan table, Set<Expression> tableFilterSet,
             boolean isPartitionedTable, PartitionInfo partitionInfo, List<Long> selectedPartitionIds) {
         super(other.nodeId, other.inputRows, other.outputRows, other.commonFilteredRows, other.commonFilterInputRows, other.runtimeFilteredRows,
                 other.runtimeFilterInputRows, other.joinBuilderRows, other.joinProbeRows, other.joinBuilderSkewRatio, other.joinProbeSkewRatio,
                 other.instanceNum);
+        this.table = table;
         this.tableFilterSet = tableFilterSet;
         this.isPartitionedTable = isPartitionedTable;
         this.partitionInfo = partitionInfo;
@@ -72,18 +77,20 @@ public class TablePlanStatistics extends PlanStatistics {
     public void buildPartitionColumnPredicatesAndOthers(Set<Expression> tableFilterSet, PartitionInfo partitionInfo) {
         partitionColumnPredicates.clear();
         otherPredicate.clear();
-        for (Expression expr : tableFilterSet) {
-            Set<Slot> inputSlot = expr.getInputSlots();
-            if (inputSlot.size() == 1 && inputSlot.iterator().next() instanceof SlotReference
-                && ((SlotReference) inputSlot.iterator().next()).getColumn().isPresent()) {
-                Column filterColumn = ((SlotReference) inputSlot.iterator().next()).getColumn().get();
-                if (partitionInfo.getPartitionColumns().contains(filterColumn)) {
-                    partitionColumnPredicates.add(expr);
+        if (tableFilterSet != null) {
+            for (Expression expr : tableFilterSet) {
+                Set<Slot> inputSlot = expr.getInputSlots();
+                if (inputSlot.size() == 1 && inputSlot.iterator().next() instanceof SlotReference
+                        && ((SlotReference) inputSlot.iterator().next()).getColumn().isPresent()) {
+                    Column filterColumn = ((SlotReference) inputSlot.iterator().next()).getColumn().get();
+                    if (partitionInfo.getPartitionColumns().contains(filterColumn)) {
+                        partitionColumnPredicates.add(expr);
+                    } else {
+                        otherPredicate.add(expr);
+                    }
                 } else {
                     otherPredicate.add(expr);
                 }
-            } else {
-                otherPredicate.add(expr);
             }
         }
     }
@@ -104,5 +111,9 @@ public class TablePlanStatistics extends PlanStatistics {
 
     public boolean isPartitionedTable() {
         return this.isPartitionedTable;
+    }
+
+    public PhysicalOlapScan getTable() {
+        return table;
     }
 }

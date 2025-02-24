@@ -35,6 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public class HistoryBasedPlanStatisticsUtil {
 
@@ -100,12 +101,12 @@ public class HistoryBasedPlanStatisticsUtil {
         boolean hasSamePartition = currentInputStatistics.hasSamePartitionId(historicalInputStatistics);
         boolean hasSamePartitionColumnPredicate = currentInputStatistics.hasSamePartitionColumnPredicates(historicalInputStatistics);
         boolean hasSameOtherPredicate = currentInputStatistics.hasSameOtherPredicates(historicalInputStatistics);
-        boolean hasSimilarStats = similarStats(currentInputStatistics.getOutputRows(),
-                historicalInputStatistics.getOutputRows(), rowThreshold);
+        boolean hasSimilarStats = true;//similarStats(currentInputStatistics.getOutputRows(),
+                //historicalInputStatistics.getOutputRows(), rowThreshold);
         if (needMatchSelectedPartition && needMatchPartitionColumnPredicate && needMatchOtherPredicate) {
             return hasSamePartition && hasSamePartitionColumnPredicate && hasSameOtherPredicate;
         } else if (needMatchSelectedPartition && !needMatchPartitionColumnPredicate && needMatchOtherPredicate) {
-            return hasSamePartition && !hasSamePartitionColumnPredicate && hasSameOtherPredicate && hasSimilarStats;
+            return hasSamePartition && hasSameOtherPredicate && hasSimilarStats;
         } else if (needMatchSelectedPartition && needMatchPartitionColumnPredicate && !needMatchOtherPredicate) {
             return hasSamePartition && hasSamePartitionColumnPredicate && hasSimilarStats;
         } else if (needMatchSelectedPartition && !needMatchPartitionColumnPredicate && !needMatchOtherPredicate) {
@@ -165,7 +166,7 @@ public class HistoryBasedPlanStatisticsUtil {
         return stats1 >= (1 - threshold) * stats2 && stats1 <= (1 + threshold) * stats2;
     }
 
-    public static void collectScans(AbstractPlan planNode, List<LogicalOlapScan> scanList) {
+    public static void collectScans(AbstractPlan planNode, Set<LogicalOlapScan> scanList) {
         if (planNode instanceof LogicalOlapScan) {
             scanList.add((LogicalOlapScan) planNode);
         } else if (planNode instanceof GroupPlan
@@ -196,7 +197,8 @@ public class HistoryBasedPlanStatisticsUtil {
             HistoricalPlanStatistics oldHistoricalPlanStatistics,
             List<PlanStatistics> inputTableStatistics,
             double historyMatchingThreshold,
-            double hboRfSafeThreshold) {
+            double hboRfSafeThreshold,
+            boolean isEnableHboNonStrictMatchingMode) {
         List<HistoricalPlanStatisticsEntry> lastRunsStatistics = oldHistoricalPlanStatistics.getLastRunsStatistics();
         if (lastRunsStatistics.isEmpty()) {
             return Optional.empty();
@@ -223,19 +225,23 @@ public class HistoryBasedPlanStatisticsUtil {
             return Optional.of(lastRunsStatistics.get(accurateStatsMatchPartitionIdAndOtherPredicateIndex.get()));
         }
 
-        // MATCH 3: TODO: reconsider this option's safety
-        Optional<Integer> accurateStatsOnlyMatchPartitionIdIndex = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
-                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold,
-                true, false, false);
-        if (accurateStatsOnlyMatchPartitionIdIndex.isPresent()) {
-            return Optional.of(lastRunsStatistics.get(accurateStatsOnlyMatchPartitionIdIndex.get()));
-        }
+        if (isEnableHboNonStrictMatchingMode) {
+            // MATCH 3: TODO: reconsider this option's safety
+            Optional<Integer> accurateStatsOnlyMatchPartitionIdIndex
+                    = HistoryBasedPlanStatisticsUtil.getAccurateStatsIndex(
+                    oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold,
+                    true, false, false);
+            if (accurateStatsOnlyMatchPartitionIdIndex.isPresent()) {
+                return Optional.of(lastRunsStatistics.get(accurateStatsOnlyMatchPartitionIdIndex.get()));
+            }
 
-        // MATCH 4: TODO: this option is actually useless
-        Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
-                oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
-        if (similarStatsIndex.isPresent()) {
-            return Optional.of(lastRunsStatistics.get(similarStatsIndex.get()));
+            // MATCH 4: TODO: this option is actually useless since the inputTableStatistics is not exactly the current input
+            // but actually a mocked one with the non-current row count (TODO: NEED TO check presto's action otherwise it will always match and introduce risk)
+            Optional<Integer> similarStatsIndex = HistoryBasedPlanStatisticsUtil.getSimilarStatsIndex(
+                    oldHistoricalPlanStatistics, inputTableStatistics, historyMatchingThreshold, hboRfSafeThreshold);
+            if (similarStatsIndex.isPresent()) {
+                return Optional.of(lastRunsStatistics.get(similarStatsIndex.get()));
+            }
         }
         // TODO: Use linear regression to predict stats if we have only 1 table.
         return Optional.empty();

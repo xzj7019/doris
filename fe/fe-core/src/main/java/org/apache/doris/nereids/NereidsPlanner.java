@@ -466,13 +466,13 @@ public class NereidsPlanner extends Planner {
             // fill table to expr map
             if (root instanceof PhysicalFilter && root.children().get(0) instanceof PhysicalOlapScan) {
                 PhysicalOlapScan tableScan = (PhysicalOlapScan) root.children().get(0);
-                Map<PhysicalPlan, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
+                Map<TableIf, Set<Expression>> tableToFilterExprMap = HistoryBasedPlanStatisticsManager.getInstance()
                         .getHistoryBasedIdToPlanMapProvider().getTableToExprMap(queryId);
                 if (tableToFilterExprMap.isEmpty()) {
                     HistoryBasedPlanStatisticsManager.getInstance()
                             .getHistoryBasedIdToPlanMapProvider().putTableToExprMap(queryId, tableToFilterExprMap);
                 }
-                tableToFilterExprMap.put(tableScan, ((PhysicalFilter) root).getConjuncts());
+                tableToFilterExprMap.put(tableScan.getTable(), ((PhysicalFilter) root).getConjuncts());
             }
         }
     }

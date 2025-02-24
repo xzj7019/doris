@@ -18,6 +18,7 @@
 package org.apache.doris.statistics;
 import org.apache.doris.catalog.PartitionInfo;
 import org.apache.doris.nereids.trees.expressions.Expression;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalOlapScan;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.qe.ConnectContext;
 import org.apache.doris.thrift.TPlanNodeRuntimeStatsItem;
@@ -66,7 +67,8 @@ public class PlanStatistics {
         this.instanceNum = instanceNum;
     }
 
-    public static PlanStatistics buildFromStatsItem(TPlanNodeRuntimeStatsItem item, boolean isTablePlanStatistics, boolean isPartitionedTable,
+    public static PlanStatistics buildFromStatsItem(TPlanNodeRuntimeStatsItem item, boolean isTablePlanStatistics, PhysicalOlapScan tableScan,
+            boolean isPartitionedTable,
             Set<Expression> tableToExprSet, PartitionInfo partitionInfo, List<Long> selectedPartitionIds) {
         if (isTablePlanStatistics) {
             return new TablePlanStatistics(item.getNodeId(), item.getInputRows(), item.getOutputRows(),
@@ -74,7 +76,7 @@ public class PlanStatistics {
                     item.getCommonFilterInputRows(), item.getRuntimeFilterRows(), item.getRuntimeFilterInputRows(),
                     item.getJoinBuilderRows(), item.getJoinProbeRows(),
                     item.getJoinBuilderSkewRatio(), item.getJoinProberSkewRatio(), item.getInstanceNum(),
-                    tableToExprSet, isPartitionedTable, partitionInfo, selectedPartitionIds);
+                    tableScan, tableToExprSet, isPartitionedTable, partitionInfo, selectedPartitionIds);
         } else {
             return new PlanStatistics(item.getNodeId(), item.getInputRows(), item.getOutputRows(),
                     item.getCommonFilterRows(),

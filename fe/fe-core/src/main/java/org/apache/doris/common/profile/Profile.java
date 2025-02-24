@@ -18,6 +18,7 @@
 package org.apache.doris.common.profile;
 
 import org.apache.doris.catalog.PartitionInfo;
+import org.apache.doris.catalog.TableIf;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.io.Text;
 import org.apache.doris.common.util.DebugUtil;
@@ -401,11 +402,11 @@ public class Profile {
     }
 
     public PlanStatistics getPlanStatistics(int nodeId, List<TPlanNodeRuntimeStatsItem> itemList,
-            boolean isTablePlanStatistics, boolean isPartitionedTable, Set<Expression> tableFilterSet, PartitionInfo partitionInfo,
+            boolean isTablePlanStatistics, PhysicalOlapScan scan, boolean isPartitionedTable, Set<Expression> tableFilterSet, PartitionInfo partitionInfo,
             List<Long> selectedPartitionIds) {
         for (TPlanNodeRuntimeStatsItem item : itemList) {
             if (item.node_id == nodeId) {
-                return PlanStatistics.buildFromStatsItem(item, isTablePlanStatistics, isPartitionedTable, tableFilterSet, partitionInfo,
+                return PlanStatistics.buildFromStatsItem(item, isTablePlanStatistics, scan, isPartitionedTable, tableFilterSet, partitionInfo,
                         selectedPartitionIds);
             }
         }
@@ -413,7 +414,7 @@ public class Profile {
     }
 
     public PlanNodeCanonicalInfo buildPlanNodeCanonicalInfo(PhysicalPlan root, Map<PhysicalPlan, Integer> planToIdMap,
-            Map<PhysicalPlan, Set<Expression>> tableToExprMap,
+            Map<TableIf, Set<Expression>> tableToExprMap,
             List<TPlanNodeRuntimeStatsItem> runtimeStatsItem) {
         String canonicalPlanString = ((AbstractPhysicalPlan) root).hboTreeString();
         String hashValue = HistoryBasedPlanStatisticsUtil.hashCanonicalPlan(canonicalPlanString);
@@ -422,9 +423,9 @@ public class Profile {
         for (PhysicalOlapScan scan : scans) {
             int nodeId = planToIdMap.get(scan);
             // TODO: optimize the search logic to make a map to speed up the searching from runtimeStatsItem
-            PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem, true,
+            PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem, true, scan,
                     scan.getTable().isPartitionedTable(),
-                    tableToExprMap.get(scan), scan.getTable().getPartitionInfo(), scan.getSelectedPartitionIds());
+                    tableToExprMap.get(scan.getTable()), scan.getTable().getPartitionInfo(), scan.getSelectedPartitionIds());
             if (!planStatistics.equals(PlanStatistics.EMPTY)) {
                 inputTableStatisticsBuilder.add(planStatistics);
             }
@@ -434,7 +435,7 @@ public class Profile {
 
     public Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> generatePlanStatisticsMap(
             Map<Integer, PhysicalPlan> idToPlanMap, Map<PhysicalPlan, Integer> planToIdMap,
-            Map<PhysicalPlan, Set<Expression>> tableToExprMap,
+            Map<TableIf, Set<Expression>> tableToExprMap,
             List<TPlanNodeRuntimeStatsItem> planNodeRuntimeStatsItems) {
         Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatisticsMap = new HashMap<>();
         for (TPlanNodeRuntimeStatsItem nodeStats : planNodeRuntimeStatsItems) {
@@ -445,15 +446,15 @@ public class Profile {
             boolean isOlapScan = false;
             boolean isPartitionedTable = false;
             if (planNode instanceof PhysicalOlapScan) {
-                if (tableToExprMap.get(planNode) != null) {
-                    tableFilterSet = tableToExprMap.get(planNode);
+                if (tableToExprMap.get(((PhysicalOlapScan) planNode).getTable()) != null) {
+                    tableFilterSet = tableToExprMap.get(((PhysicalOlapScan) planNode).getTable());
                     partitionInfo = ((PhysicalOlapScan) planNode).getTable().getPartitionInfo();
                 }
                 isOlapScan = true;
                 isPartitionedTable = ((PhysicalOlapScan) planNode).getTable().isPartitionedTable();
             }
             PlanStatistics planStatistics = PlanStatistics.buildFromStatsItem(nodeStats,
-                    isOlapScan, isPartitionedTable, tableFilterSet, partitionInfo,
+                    isOlapScan, isOlapScan ? (PhysicalOlapScan) planNode : null, isPartitionedTable, tableFilterSet, partitionInfo,
                     isOlapScan ? ((PhysicalOlapScan) planNode).getSelectedPartitionIds() : ImmutableList.of());
             if (planNode != null) {
                 PlanNodeCanonicalInfo planNodeCanonicalInfo = buildPlanNodeCanonicalInfo(
@@ -482,7 +483,7 @@ public class Profile {
         HistoryBasedIdToPlanMapProvider idToMapProvider = hboManager.getHistoryBasedIdToPlanMapProvider();
         Map<Integer, PhysicalPlan> idToPlanMap = idToMapProvider.getIdToPlanMap(queryId);
         Map<PhysicalPlan, Integer> planToIdMap = idToMapProvider.getPlanToIdMap(queryId);
-        Map<PhysicalPlan, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
+        Map<TableIf, Set<Expression>> tableToExprMap = idToMapProvider.getTableToExprMap(queryId);
         if (!idToPlanMap.isEmpty() && idToPlanMap.size() == planToIdMap.size()) {
             // get plan statistics
             Map<PlanNodeWithHash, PlanStatisticsWithSourceInfo> planStatistics = generatePlanStatisticsMap(idToPlanMap,
