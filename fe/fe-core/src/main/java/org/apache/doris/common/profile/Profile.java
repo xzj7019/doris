@@ -426,7 +426,7 @@ public class Profile {
             // TODO: optimize the search logic to make a map to speed up the searching from runtimeStatsItem
             PlanStatistics planStatistics = getPlanStatistics(nodeId, runtimeStatsItem, true, scan,
                     scan.getTable().isPartitionedTable(),
-                    tableToExprMap.get(scan.getTable()), scan.getTable().getPartitionInfo(), scan.getSelectedPartitionIds());
+                    tableToExprMap.get(scan.getRelationId()), scan.getTable().getPartitionInfo(), scan.getSelectedPartitionIds());
             if (!planStatistics.equals(PlanStatistics.EMPTY)) {
                 inputTableStatisticsBuilder.add(planStatistics);
             }
@@ -447,8 +447,8 @@ public class Profile {
             boolean isOlapScan = false;
             boolean isPartitionedTable = false;
             if (planNode instanceof PhysicalOlapScan) {
-                if (tableToExprMap.get(((PhysicalOlapScan) planNode).getTable()) != null) {
-                    tableFilterSet = tableToExprMap.get(((PhysicalOlapScan) planNode).getTable());
+                if (tableToExprMap.get(((PhysicalOlapScan) planNode).getRelationId()) != null) {
+                    tableFilterSet = tableToExprMap.get(((PhysicalOlapScan) planNode).getRelationId());
                     partitionInfo = ((PhysicalOlapScan) planNode).getTable().getPartitionInfo();
                 }
                 isOlapScan = true;
