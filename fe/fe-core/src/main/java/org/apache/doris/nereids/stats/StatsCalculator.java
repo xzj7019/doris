@@ -319,7 +319,7 @@ public class StatsCalculator extends DefaultPlanVisitor<Statistics, Void> {
     }
 
     // For unit test only
-    public void estimate(GroupExpression groupExpression, CascadesContext context) {
+    public static void estimate(GroupExpression groupExpression, CascadesContext context) {
         StatsCalculator statsCalculator = new StatsCalculator(groupExpression, false,
                 new HashMap<>(), false, Collections.emptyMap(), context);
         statsCalculator.estimate();
