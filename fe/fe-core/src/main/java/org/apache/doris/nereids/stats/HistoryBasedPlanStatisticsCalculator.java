@@ -155,9 +155,7 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
         PlanStatistics matchedPlanStatistics = HistoryBasedPlanStatisticsUtil.getMatchedPlanStatistics(planStatistics,
                 cascadesContext.getConnectContext());
         if (matchedPlanStatistics != null) {
-            // todo: choose which one is the output rows count
-            delegateStats = delegateStats.withRowCountAndEnforceValid(
-                    matchedPlanStatistics.getOutputRows());
+            delegateStats = delegateStats.withRowCountAndHboFlag(matchedPlanStatistics.getOutputRows());
         }
         return delegateStats;
     }
