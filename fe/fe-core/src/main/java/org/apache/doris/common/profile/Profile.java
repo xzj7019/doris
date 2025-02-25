@@ -631,9 +631,13 @@ public class Profile {
                 mergedProfile.prettyPrint(builder, "     ");
                 planNodeRuntimeStatsItems = RuntimeProfile.toTPlanNodeRuntimeStatsItem(mergedProfile, null);
                 planNodeRuntimeStatsItems = RuntimeProfile.mergeTPlanNodeRuntimeStatsItem(planNodeRuntimeStatsItems);
-                // publish to hbo manager
-                String queryId = DebugUtil.printId(this.executionProfiles.get(0).getQueryId());
-                publishHistoricalStatistics(queryId, planNodeRuntimeStatsItems);
+                if (isHealthy()) {
+                    // publish to hbo manager, currently only support healthy sql.
+                    // TODO: failed sql supporting rely on profile's extension.
+                    // NOTE: all statements which no need to collect profile have been excluded by profile self
+                    String queryId = DebugUtil.printId(this.executionProfiles.get(0).getQueryId());
+                    publishHistoricalStatistics(queryId, planNodeRuntimeStatsItems);
+                }
                 // for debug
                 builder.append("\nHBOStatics \n");
                 builder.append(DebugUtil.prettyPrintPlanNodeRuntimeStatsItems(planNodeRuntimeStatsItems));
@@ -912,6 +916,30 @@ public class Profile {
         builder.append("\nChanged Session Variables:\n");
         builder.append(changedSessionVarCache);
         builder.append("\n");
+    }
+
+    private boolean isHealthy() {
+        if (this.summaryProfile.getAsInfoStings() == null
+            || this.summaryProfile.getAsInfoStings().isEmpty()) {
+            return false;
+        } else {
+            String totalTimeString = this.summaryProfile.getAsInfoStings().get(SummaryProfile.TOTAL_TIME);
+            boolean isSlowQuery = false;
+            if (totalTimeString.length() - 2 > 0) {
+                int strLen = totalTimeString.length() - 2;
+                totalTimeString = totalTimeString.substring(0, strLen);
+                long totalTimeMs = Long.valueOf(totalTimeString);
+                // todo: get it from hboManager or session variables
+                isSlowQuery = totalTimeMs > 5000;
+            }
+            boolean isOk = this.summaryProfile.getAsInfoStings().get(SummaryProfile.TASK_STATE)
+                    .equalsIgnoreCase("ok");
+            boolean isEof = this.summaryProfile.getAsInfoStings().get(SummaryProfile.TASK_STATE)
+                    .equalsIgnoreCase("eof");
+            boolean noErrorMessage = this.summaryProfile.getExecutionSummary()
+                    .getInfoString(SummaryProfile.SYSTEM_MESSAGE).equalsIgnoreCase("N/A");
+            return (isOk || isEof) && noErrorMessage;
+        }
     }
 
     private void getOnStorageProfile(StringBuilder builder) {
