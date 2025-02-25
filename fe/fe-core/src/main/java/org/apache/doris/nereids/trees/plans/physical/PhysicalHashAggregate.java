@@ -24,6 +24,7 @@ import org.apache.doris.nereids.properties.PhysicalProperties;
 import org.apache.doris.nereids.properties.RequireProperties;
 import org.apache.doris.nereids.properties.RequirePropertiesSupplier;
 import org.apache.doris.nereids.trees.expressions.AggregateExpression;
+import org.apache.doris.nereids.trees.expressions.Alias;
 import org.apache.doris.nereids.trees.expressions.Expression;
 import org.apache.doris.nereids.trees.expressions.NamedExpression;
 import org.apache.doris.nereids.trees.expressions.Slot;
@@ -45,6 +46,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -214,10 +216,28 @@ public class PhysicalHashAggregate<CHILD_TYPE extends Plan> extends PhysicalUnar
 
     @Override
     public String toHboString() {
-        List<Object> args = Lists.newArrayList(
-                "groupByExpr", groupByExpressions,
-                "outputExpr", outputExpressions);
-        return Utils.toSqlString("Aggregate", args.toArray());
+        StringBuilder builder = new StringBuilder();
+        String aggPhase = "Aggregate(" + this.aggregateParam.aggPhase.toString() + ")";
+        List<Object> groupByExpressionsArgs = Lists.newArrayList(
+                "groupByExpr", groupByExpressions);
+        builder.append(Utils.toSqlString(aggPhase, groupByExpressionsArgs.toArray()));
+
+        builder.append("outputExpr=");
+        for (NamedExpression expr : outputExpressions) {
+            if (expr instanceof Alias) {
+                if (expr.child(0) instanceof AggregateExpression) {
+                    builder.append(((AggregateExpression) expr.child(0)).getFunction().getName());
+                } else if (expr.child(0) instanceof AggregateFunction) {
+                    builder.append(((AggregateFunction) expr.child(0)).getName());
+                } else {
+                    builder.append(Utils.toStringOrNull(expr));
+                }
+            } else {
+                builder.append(Utils.toStringOrNull(expr));
+            }
+        }
+
+        return builder.toString();
     }
 
     /**

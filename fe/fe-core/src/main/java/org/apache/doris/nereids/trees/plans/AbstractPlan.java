@@ -30,6 +30,7 @@ import org.apache.doris.nereids.trees.plans.TreeStringPlan.TreeStringNode;
 import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
+import org.apache.doris.nereids.trees.plans.physical.PhysicalHashAggregate;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.util.MutableState;
 import org.apache.doris.nereids.util.TreeStringUtils;
@@ -151,12 +152,24 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
                 } else if (plan instanceof AbstractLogicalPlan) {
                     builder.append(((AbstractPlan) plan).hboTreeString());
                 } else if (plan instanceof AbstractPhysicalPlan) {
-                    builder.append(((AbstractPlan) plan).hboTreeString());
+                    if (!isLocalAggPhysicalNode((AbstractPhysicalPlan) plan)) {
+                        builder.append(((AbstractPlan) plan).hboTreeString());
+                    } else {
+                        builder.append(((AbstractPlan) plan.child(0)).hboTreeString());
+                    }
                 } else {
                     throw new RuntimeException("hboTreeString illegal plan type");
                 }
             }
             return builder.toString();
+        }
+    }
+
+    private boolean isLocalAggPhysicalNode(AbstractPhysicalPlan plan) {
+        if (plan instanceof PhysicalHashAggregate && ((PhysicalHashAggregate<?>) plan).getAggPhase().isLocal()) {
+            return true;
+        } else {
+            return false;
         }
     }
 

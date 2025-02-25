@@ -925,13 +925,14 @@ public class Profile {
         } else {
             String totalTimeString = this.summaryProfile.getAsInfoStings().get(SummaryProfile.TOTAL_TIME);
             boolean isSlowQuery = false;
-            if (totalTimeString.length() - 2 > 0) {
-                int strLen = totalTimeString.length() - 2;
-                totalTimeString = totalTimeString.substring(0, strLen);
-                long totalTimeMs = Long.valueOf(totalTimeString);
+            // xxxms, todo: xxsecxxx, xxminxxx, etc
+            //if (totalTimeString.length() - 2 > 0) {
+            //    int strLen = totalTimeString.length() - 2;
+            //    totalTimeString = totalTimeString.substring(0, strLen);
+            //    long totalTimeMs = Long.valueOf(totalTimeString);
                 // todo: get it from hboManager or session variables
-                isSlowQuery = totalTimeMs > 5000;
-            }
+            //    isSlowQuery = totalTimeMs > 5000;
+            //}
             boolean isOk = this.summaryProfile.getAsInfoStings().get(SummaryProfile.TASK_STATE)
                     .equalsIgnoreCase("ok");
             boolean isEof = this.summaryProfile.getAsInfoStings().get(SummaryProfile.TASK_STATE)

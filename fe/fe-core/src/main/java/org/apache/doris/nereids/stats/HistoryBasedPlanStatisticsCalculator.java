@@ -110,6 +110,12 @@ public class HistoryBasedPlanStatisticsCalculator extends StatsCalculator {
     @Override
     protected Statistics computeAggregate(Aggregate<? extends Plan> aggregate) {
         Statistics legacyStats = super.computeAggregate(aggregate);
+        // TODO: aggr has two times matching, one is the global but logical aggr
+        // another is local but physical aggr.
+        // the physical one can be matched but the logical one is hard
+        // e.g, logical one is like "count(*) AS `count(*)`#4"
+        //      local physical one is like "partial_count(*) AS `partial_count(*)`#5"
+        //      global physical one is like "count(partial_count(*)#5) AS `count(*)`#4"
         return getStatsFromHbo((AbstractPlan) aggregate, legacyStats);
     }
 
