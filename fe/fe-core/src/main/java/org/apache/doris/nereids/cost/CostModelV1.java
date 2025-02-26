@@ -479,19 +479,25 @@ class CostModelV1 extends PlanVisitor<Cost, PlanContext> {
                     buildSideFactor = Math.pow(totalInstanceNumber, 0.5);
                 }
             }
+
             // hbo to adjust bc cost parameter to reduce bc cost
-            PlanNodeWithHash planNodeWithHash = HistoryBasedPlanStatisticsUtil.getPlanNodeHash(physicalHashJoin);
-            HistoricalPlanStatistics planStatistics = historyBasedPlanStatisticsProvider.getHboStats(planNodeWithHash);
-            PlanStatistics matchedPlanStatistics = HistoryBasedPlanStatisticsUtil.getMatchedPlanStatistics(planStatistics,
-                    context.getStatementContext().getConnectContext());
-            if (matchedPlanStatistics != null) {
-                int builderSkewRatio = matchedPlanStatistics.getJoinBuilderSkewRatio();
-                int probeSkewRatio = matchedPlanStatistics.getJoinProbeSkewRatio();
-                // TODO: add into session variable
-                if (builderSkewRatio > 10 || probeSkewRatio > 10) {
-                    probeShortcutFactor = probeShortcutFactor * 0.1;
+            if (context.getSessionVariable() != null
+                    && context.getSessionVariable().isEnableHboOptimization()
+                    && context.getSessionVariable().isEnableHboInfoCollection()) {
+                PlanNodeWithHash planNodeWithHash = HistoryBasedPlanStatisticsUtil.getPlanNodeHash(physicalHashJoin);
+                HistoricalPlanStatistics planStatistics = historyBasedPlanStatisticsProvider.getHboStats(planNodeWithHash);
+                PlanStatistics matchedPlanStatistics = HistoryBasedPlanStatisticsUtil.getMatchedPlanStatistics(planStatistics,
+                        context.getStatementContext().getConnectContext());
+                if (matchedPlanStatistics != null) {
+                    int builderSkewRatio = matchedPlanStatistics.getJoinBuilderSkewRatio();
+                    int probeSkewRatio = matchedPlanStatistics.getJoinProbeSkewRatio();
+                    // TODO: add into session variable
+                    if (builderSkewRatio > 10 || probeSkewRatio > 10) {
+                        probeShortcutFactor = probeShortcutFactor * 0.1;
+                    }
                 }
             }
+
             return CostV1.of(context.getSessionVariable(),
                     leftRowCount * probeShortcutFactor + rightRowCount * probeShortcutFactor * buildSideFactor
                             + outputRowCount * probeSideFactor,

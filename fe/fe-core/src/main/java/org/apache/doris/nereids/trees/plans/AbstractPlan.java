@@ -17,16 +17,19 @@
 
 package org.apache.doris.nereids.trees.plans;
 
+import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.nereids.analyzer.Unbound;
 import org.apache.doris.nereids.memo.GroupExpression;
 import org.apache.doris.nereids.properties.DataTrait;
 import org.apache.doris.nereids.properties.LogicalProperties;
 import org.apache.doris.nereids.properties.UnboundLogicalProperties;
+import org.apache.doris.nereids.stats.HistoryBasedPlanStatisticsUtil;
 import org.apache.doris.nereids.trees.AbstractTreeNode;
 import org.apache.doris.nereids.trees.expressions.ExprId;
 import org.apache.doris.nereids.trees.expressions.Slot;
 import org.apache.doris.nereids.trees.expressions.StatementScopeIdGenerator;
 import org.apache.doris.nereids.trees.plans.TreeStringPlan.TreeStringNode;
+import org.apache.doris.nereids.trees.plans.algebra.OlapScan;
 import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
 import org.apache.doris.nereids.trees.plans.physical.AbstractPhysicalPlan;
@@ -34,6 +37,7 @@ import org.apache.doris.nereids.trees.plans.physical.PhysicalHashAggregate;
 import org.apache.doris.nereids.trees.plans.physical.PhysicalPlan;
 import org.apache.doris.nereids.util.MutableState;
 import org.apache.doris.nereids.util.TreeStringUtils;
+import org.apache.doris.nereids.util.Utils;
 import org.apache.doris.statistics.Statistics;
 
 import com.google.common.base.Preconditions;
@@ -47,6 +51,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -145,35 +150,36 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
             Collections.sort(mutableChildren, new Comparator<Plan>() {
                 @Override
                 public int compare(Plan plan1, Plan plan2) {
-                    if (plan1 instanceof AbstractLogicalPlan && plan2 instanceof AbstractLogicalPlan) {
+                    /*if (plan1 instanceof GroupPlan && plan2 instanceof GroupPlan) {
+                        if (((GroupPlan) plan1).getGroup() != null && ((GroupPlan) plan2).getGroup() != null) {
+                            int groupId1 = ((GroupPlan) plan1).getGroup().getGroupId().asInt();
+                            int groupId2 = ((GroupPlan) plan2).getGroup().getGroupId().asInt();
+                            return groupId1 - groupId2;
+                        } else {
+                            return 0;
+                        }
+                    } else if (plan1 instanceof AbstractLogicalPlan && plan2 instanceof AbstractLogicalPlan) {
                         return ((AbstractLogicalPlan) plan1).getId() - ((AbstractLogicalPlan) plan2).getId();
                     } else if (plan1 instanceof AbstractPhysicalPlan && plan2 instanceof AbstractPhysicalPlan) {
+                        // TODO: if we won't to change the generation side's sort but only sort the matching side, just return 0 is ok;
                         return ((AbstractPhysicalPlan) plan1).getId() - ((AbstractPhysicalPlan) plan2).getId();
-                    } else if (plan1 instanceof GroupPlan && plan2 instanceof GroupPlan) {
-                        return ((GroupPlan) plan1).getId() - ((GroupPlan) plan2).getId();
                     } else {
-                        return plan1.hashCode() - plan2.hashCode();
-                    }
+                        return 0;
+                    }*/
+                    List<String> olapTables1 = new ArrayList<>();
+                    List<String> olapTables2 = new ArrayList<>();
+                    HistoryBasedPlanStatisticsUtil.collectScans((AbstractPlan) plan1, olapTables1);
+                    HistoryBasedPlanStatisticsUtil.collectScans((AbstractPlan) plan2, olapTables2);
+                    Collections.sort(olapTables1);
+                    Collections.sort(olapTables2);
+                    String str1 = Utils.qualifiedName(olapTables1, "");
+                    String str2 = Utils.qualifiedName(olapTables2, "");
+                    return str1.compareTo(str2);
                 }
             });
             for (Plan plan : mutableChildren) {
-                if (plan instanceof GroupPlan
-                        // FIXME: get 0 can not cover all cases
-                        && !((GroupPlan) plan).getGroup().getLogicalExpressions().isEmpty()
-                        && ((GroupPlan) plan).getGroup().getLogicalExpressions()
-                        .get(0).getPlan() instanceof LogicalPlan) {
-                    AbstractLogicalPlan logicalPlan = (AbstractLogicalPlan) ((GroupPlan) plan).getGroup()
-                            .getLogicalExpressions().get(0).getPlan();
-                    builder.append(logicalPlan.hboTreeString());
-                } else if (plan instanceof GroupPlan
-                        && ((GroupPlan) plan).getGroup().getLogicalExpressions().isEmpty()
-                        && !((GroupPlan) plan).getGroup().getPhysicalExpressions().isEmpty()
-                        // FIXME: get 0 can not cover all cases
-                        && ((GroupPlan) plan).getGroup().getPhysicalExpressions()
-                        .get(0).getPlan() instanceof AbstractPhysicalPlan) {
-                    AbstractPhysicalPlan physicalPlan = (AbstractPhysicalPlan) ((GroupPlan) plan).getGroup()
-                            .getPhysicalExpressions().get(0).getPlan();
-                    builder.append(physicalPlan.hboTreeString());
+                if (plan instanceof GroupPlan) {
+                    builder.append(((GroupPlan) plan).toHboString());
                 } else if (plan instanceof AbstractLogicalPlan) {
                     builder.append(((AbstractPlan) plan).hboTreeString());
                 } else if (plan instanceof AbstractPhysicalPlan) {
@@ -190,7 +196,7 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
         }
     }
 
-    private boolean isLocalAggPhysicalNode(AbstractPhysicalPlan plan) {
+    public static boolean isLocalAggPhysicalNode(AbstractPhysicalPlan plan) {
         if (plan instanceof PhysicalHashAggregate && ((PhysicalHashAggregate<?>) plan).getAggPhase().isLocal()) {
             return true;
         } else {

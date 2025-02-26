@@ -17,6 +17,7 @@
 
 package org.apache.doris.nereids.stats;
 
+import org.apache.doris.catalog.OlapTable;
 import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.nereids.CascadesContext;
 import org.apache.doris.nereids.trees.expressions.Expression;
@@ -24,6 +25,7 @@ import org.apache.doris.nereids.trees.plans.AbstractPlan;
 import org.apache.doris.nereids.trees.plans.GroupPlan;
 import org.apache.doris.nereids.trees.plans.Plan;
 import org.apache.doris.nereids.trees.plans.RelationId;
+import org.apache.doris.nereids.trees.plans.algebra.OlapScan;
 import org.apache.doris.nereids.trees.plans.logical.AbstractLogicalPlan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalOlapScan;
 import org.apache.doris.nereids.trees.plans.logical.LogicalPlan;
@@ -176,9 +178,11 @@ public class HistoryBasedPlanStatisticsUtil {
         return stats1 >= (1 - threshold) * stats2 && stats1 <= (1 + threshold) * stats2;
     }
 
-    public static void collectScans(AbstractPlan planNode, Set<LogicalOlapScan> scanList) {
+    public static void collectScans(AbstractPlan planNode, List<String> scanList) {
         if (planNode instanceof LogicalOlapScan) {
-            scanList.add((LogicalOlapScan) planNode);
+            scanList.add(((OlapScan) planNode).getTable().getNameWithFullQualifiers() + ((LogicalOlapScan) planNode).getRelationId().toString());
+        } else if (planNode instanceof PhysicalOlapScan) {
+            scanList.add(((OlapScan) planNode).getTable().getNameWithFullQualifiers() + ((PhysicalOlapScan) planNode).getRelationId().toString());
         } else if (planNode instanceof GroupPlan
                 && !((GroupPlan) planNode).getGroup().getLogicalExpressions().isEmpty()
                 && ((GroupPlan) planNode).getGroup()
