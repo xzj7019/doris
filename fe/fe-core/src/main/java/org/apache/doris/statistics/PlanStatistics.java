@@ -113,7 +113,8 @@ public class PlanStatistics {
 
     public boolean isRuntimeFilterSafeNode(double rfSafeThreshold) {
         ConnectContext ctx = ConnectContext.get();
-        if (runtimeFilteredRows == 0 && runtimeFilterInputRows == 0) {
+        // no need to check runtimeFilterInputRows if runtimeFilteredRows is 0
+        if (runtimeFilteredRows == 0 /*&& runtimeFilterInputRows == 0*/) {
             return true;
         } else if (runtimeFilteredRows > 0 && runtimeFilterInputRows > 0
                 && runtimeFilterInputRows >= runtimeFilteredRows) {

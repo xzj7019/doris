@@ -492,7 +492,7 @@ class CostModelV1 extends PlanVisitor<Cost, PlanContext> {
                     int builderSkewRatio = matchedPlanStatistics.getJoinBuilderSkewRatio();
                     int probeSkewRatio = matchedPlanStatistics.getJoinProbeSkewRatio();
                     // TODO: add into session variable
-                    if (builderSkewRatio > 10 || probeSkewRatio > 10) {
+                    if (builderSkewRatio > 5 || probeSkewRatio > 5) {
                         probeShortcutFactor = probeShortcutFactor * 0.1;
                     }
                 }
