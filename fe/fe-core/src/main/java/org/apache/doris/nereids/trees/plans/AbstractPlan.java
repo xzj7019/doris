@@ -44,6 +44,9 @@ import com.google.common.collect.Lists;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -131,7 +134,29 @@ public abstract class AbstractPlan extends AbstractTreeNode<Plan> implements Pla
         if (this.children().isEmpty()) {
             return builder.toString();
         } else {
-            for (Plan plan : children) {
+            List<Plan> mutableChildren = new ArrayList<>(children);
+            // the following sorting will increase the plan matching ratio during cbo stage
+            // e.g, the final physical plan's plan is encoded as 'a join b'
+            // but the group plan is 'b join a' which should be matched also.
+            // but it will increase the risk brought from rf, as above, the physical plan 'a join b'
+            // is with rf's potential influence which will not exactly the same as 'b join a'
+            // but when we ignore the join sides, it will bring the wrong matching and increase the
+            // dependence for the rf-safe checking.
+            Collections.sort(mutableChildren, new Comparator<Plan>() {
+                @Override
+                public int compare(Plan plan1, Plan plan2) {
+                    if (plan1 instanceof AbstractLogicalPlan && plan2 instanceof AbstractLogicalPlan) {
+                        return ((AbstractLogicalPlan) plan1).getId() - ((AbstractLogicalPlan) plan2).getId();
+                    } else if (plan1 instanceof AbstractPhysicalPlan && plan2 instanceof AbstractPhysicalPlan) {
+                        return ((AbstractPhysicalPlan) plan1).getId() - ((AbstractPhysicalPlan) plan2).getId();
+                    } else if (plan1 instanceof GroupPlan && plan2 instanceof GroupPlan) {
+                        return ((GroupPlan) plan1).getId() - ((GroupPlan) plan2).getId();
+                    } else {
+                        return plan1.hashCode() - plan2.hashCode();
+                    }
+                }
+            });
+            for (Plan plan : mutableChildren) {
                 if (plan instanceof GroupPlan
                         // FIXME: get 0 can not cover all cases
                         && !((GroupPlan) plan).getGroup().getLogicalExpressions().isEmpty()
