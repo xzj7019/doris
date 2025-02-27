@@ -113,17 +113,15 @@ public class PlanStatistics {
 
     public boolean isRuntimeFilterSafeNode(double rfSafeThreshold) {
         ConnectContext ctx = ConnectContext.get();
-        // no need to check runtimeFilterInputRows if runtimeFilteredRows is 0
-        if (runtimeFilteredRows == 0 /*&& runtimeFilterInputRows == 0*/) {
+        // no need to check runtimeFilterInputRows if runtimeFilteredRows is 0 or threshold <= 0
+        if (rfSafeThreshold <= 0) {
+            return true;
+        } else if (runtimeFilteredRows == 0 /*&& runtimeFilterInputRows == 0*/) {
             return true;
         } else if (runtimeFilteredRows > 0 && runtimeFilterInputRows > 0
                 && runtimeFilterInputRows >= runtimeFilteredRows) {
-            if (rfSafeThreshold > 0) {
-                double rfFilterRatio = (double) (100 * runtimeFilteredRows / runtimeFilterInputRows);
-                return rfFilterRatio < 100 * rfSafeThreshold;
-            } else {
-                return false;
-            }
+            double rfFilterRatio = (double) (100 * runtimeFilteredRows / runtimeFilterInputRows);
+            return rfFilterRatio < 100 * rfSafeThreshold;
         } else {
             throw new RuntimeException("Illegal runtime stats found");
         }

@@ -231,7 +231,7 @@ public class LogicalOlapScan extends LogicalCatalogRelation implements OlapScan 
         if (selectedPartitionIds.size() != partitionCount) {
             partitions = " partitions(" + selectedPartitionIds.size() + "/" + partitionCount + ")";
         }
-        return Utils.toSqlString("OlapScan[" + table.getNameWithFullQualifiers() + partitions + "]");
+        return Utils.toSqlString("OlapScan[" + table.getNameWithFullQualifiers() + partitions + "]" + "@" + getTable().getVisibleVersion());
         //+ getGroupIdWithPrefix(),"RFs", builder
         //);
     }
