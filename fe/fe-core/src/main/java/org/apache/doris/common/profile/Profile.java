@@ -935,9 +935,10 @@ public class Profile {
     }
 
     private boolean isSlowQuery() {
+        // TODO: threshold should be from hbo manager
         //long totalTime = this.summaryProfile.getSummary().getCounterTotalTime().getValue();
         long durationMs = this.queryFinishTimestamp - summaryProfile.getQueryBeginTime();
-        return durationMs > 100;
+        return durationMs > 10;
     }
 
     private void getOnStorageProfile(StringBuilder builder) {
