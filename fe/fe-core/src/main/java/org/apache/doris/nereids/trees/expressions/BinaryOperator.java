@@ -63,6 +63,12 @@ public abstract class BinaryOperator extends Expression implements BinaryExpress
     public String toHboString() {
         String leftHboString = left().toString();
         String rightHboString = right().toString();
+        // expression with function will not be parameterized.
+        // case: cast(s_zip as varchar(20)) = "31904"
+        // leftHboString: "substring(cast(s_zip#48 as VARCHAR(20)), 1, 20)"
+        // the '1' and '20' will not and should not be parameterized, which is expected.
+        // but the foldable expression like "substring("3190400", 1, 5)" has been folded as '31904' before cbo stage,
+        // so it is safe during the plan matching and runtime stats recording.
         if (left() instanceof Literal) {
             leftHboString = ((Literal) left()).toHboString();
         }
